@@ -1,0 +1,32 @@
+import { useState } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
+import Sidebar from './Sidebar';
+import Topbar from './Topbar';
+import { findNavLabel } from './navConfig';
+import { useWorkspace } from '../../../../app/WorkspaceContext';
+// Shared colour tokens (ink, accent, status) — the doctor styles reference these instead of raw hex.
+import '../../../../shared/styles/tokens.css';
+import './app-shell.css';
+
+const AppLayout = () => {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const location = useLocation();
+  // Nav labels are keyed by this workspace's own paths, so drop the mount prefix first.
+  const workspace = useWorkspace();
+  const localPath = location.pathname.slice(workspace.base.length) || '/';
+
+  return (
+    <div className="shell">
+      <Sidebar open={sidebarOpen} onNavigate={() => setSidebarOpen(false)} />
+      <div className={`shell-backdrop${sidebarOpen ? ' open' : ''}`} onClick={() => setSidebarOpen(false)} />
+      <div className="shell-main">
+        <Topbar title={findNavLabel(localPath)} onMenuClick={() => setSidebarOpen((v) => !v)} />
+        <main className="shell-content">
+          <Outlet />
+        </main>
+      </div>
+    </div>
+  );
+};
+
+export default AppLayout;

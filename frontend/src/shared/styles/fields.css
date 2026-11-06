@@ -1,0 +1,127 @@
+/*
+ * One look for every place staff type or choose something, in every workspace.
+ *
+ * Fields used to take their outline from each screen's own CSS — mostly #e2e8f0, a contrast of
+ * 1.23:1 against white, so on a bright clinic monitor a text box was hard to tell from the page.
+ * This sheet sets the outline, fill and focus treatment once:
+ *
+ *   outline  #7a8699 — 3.7:1 on white, above the 3:1 WCAG asks of a control's boundary
+ *   hover    darker outline
+ *   focus    the workspace accent, plus a soft ring
+ *   invalid  red (aria-invalid="true")
+ *   disabled flat grey
+ *
+ * Screens keep their own sizes, padding and corner radius; only the parts above are taken over.
+ *
+ * Specificity: per-screen rules such as `.modal-field input` or `.cons-diag-row .cons-input` would
+ * otherwise win, so each selector carries `:not(#field-theme)` — an id nothing uses — which lifts it
+ * above any class-based rule without resorting to !important.
+ *
+ * Search boxes built as a bordered wrapper around a borderless input (SEARCH_WRAPPERS below) keep
+ * their input borderless: the wrapper gets the outline and the focus ring instead, so they never
+ * show a box inside a box.
+ */
+
+:root {
+  --field-border: #7a8699;
+  --field-border-hover: #475569;
+  --field-bg: #ffffff;
+  --field-ink: #0f172a;
+  --field-placeholder: #6b7789;
+  --field-disabled-bg: #f1f5f9;
+  --field-disabled-border: #cbd5e1;
+  --field-disabled-ink: #64748b;
+  --field-invalid: #dc2626;
+}
+
+/* ---- Text boxes, number/date boxes, dropdowns and multi-line boxes ------------------------- */
+
+:is(
+    input:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [type='color'], [type='hidden'], [type='submit'], [type='button'], [type='reset'], [type='image']),
+    select,
+    textarea
+  ):not(#field-theme):not(
+    :where(.fam-search, .pat-search, .shell-search, .gs-field, .rxb-search-box, .lab-search-box, .ext-search-box, .cons-vital-input-wrap, .rp-daterange) *
+  ) {
+  border-style: solid;
+  border-width: 1.5px;
+  border-color: var(--field-border);
+  background-color: var(--field-bg);
+  color: var(--field-ink);
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+:is(input, select, textarea):not(#field-theme)::placeholder {
+  color: var(--field-placeholder);
+  opacity: 1;
+}
+
+:is(
+    input:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [type='color'], [type='hidden'], [type='submit'], [type='button'], [type='reset'], [type='image']),
+    select,
+    textarea
+  ):not(#field-theme):not(:disabled, :focus):not(
+    :where(.fam-search, .pat-search, .shell-search, .gs-field, .rxb-search-box, .lab-search-box, .ext-search-box, .cons-vital-input-wrap, .rp-daterange) *
+  ):hover {
+  border-color: var(--field-border-hover);
+}
+
+:is(
+    input:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [type='color'], [type='hidden'], [type='submit'], [type='button'], [type='reset'], [type='image']),
+    select,
+    textarea
+  ):not(#field-theme):not(
+    :where(.fam-search, .pat-search, .shell-search, .gs-field, .rxb-search-box, .lab-search-box, .ext-search-box, .cons-vital-input-wrap, .rp-daterange) *
+  ):focus {
+  outline: none;
+  border-color: var(--accent, #2563eb);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #2563eb) 22%, transparent);
+}
+
+:is(input, select, textarea):not(#field-theme)[aria-invalid='true'] {
+  border-color: var(--field-invalid);
+}
+:is(input, select, textarea):not(#field-theme)[aria-invalid='true']:focus {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--field-invalid) 20%, transparent);
+}
+
+:is(input, select, textarea):not(#field-theme):disabled,
+:is(input, select, textarea):not(#field-theme)[readonly]:not([type='date'], [type='time']) {
+  background-color: var(--field-disabled-bg);
+  border-color: var(--field-disabled-border);
+  color: var(--field-disabled-ink);
+}
+:is(input, select, textarea):not(#field-theme):disabled {
+  cursor: not-allowed;
+}
+
+/* ---- Search boxes made of a bordered wrapper around a borderless input ---------------------- */
+
+:is(.fam-search, .pat-search, .shell-search, .gs-field, .rxb-search-box, .lab-search-box, .ext-search-box, .cons-vital-input-wrap, .rp-daterange):not(#field-theme) {
+  border-style: solid;
+  border-width: 1.5px;
+  border-color: var(--field-border);
+  background-color: var(--field-bg);
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+:is(.fam-search, .pat-search, .shell-search, .gs-field, .rxb-search-box, .lab-search-box, .ext-search-box, .cons-vital-input-wrap, .rp-daterange):not(#field-theme):hover {
+  border-color: var(--field-border-hover);
+}
+:is(.fam-search, .pat-search, .shell-search, .gs-field, .rxb-search-box, .lab-search-box, .ext-search-box, .cons-vital-input-wrap, .rp-daterange):not(#field-theme):focus-within {
+  border-color: var(--accent, #2563eb);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #2563eb) 22%, transparent);
+}
+:is(.fam-search, .pat-search, .shell-search, .gs-field, .rxb-search-box, .lab-search-box, .ext-search-box, .cons-vital-input-wrap, .rp-daterange) :is(input, select):not(#field-theme) {
+  background-color: transparent;
+  color: var(--field-ink);
+}
+
+/* ---- Tick boxes and option buttons take the workspace colour ------------------------------- */
+
+input:is([type='checkbox'], [type='radio']) {
+  accent-color: var(--accent, #2563eb);
+}

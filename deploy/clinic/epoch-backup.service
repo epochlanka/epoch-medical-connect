@@ -1,0 +1,19 @@
+## Runs backup.sh once (triggered daily by epoch-backup.timer).
+## Set BACKUP_DEST (and ideally BACKUP_PASSPHRASE_FILE) in clinic.env first.
+##
+## On the clinic machine, from inside the install folder:
+##   sudo cp epoch-backup.service epoch-backup.timer /etc/systemd/system/
+##   sudo sed -i "s#__INSTALL_PATH__#$(pwd)#" /etc/systemd/system/epoch-backup.service
+##   sudo systemctl daemon-reload
+##   sudo systemctl enable --now epoch-backup.timer
+
+[Unit]
+Description=E-Poch Medical System backup (one-shot, run by epoch-backup.timer)
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=__INSTALL_PATH__
+ExecStart=__INSTALL_PATH__/backup.sh
+TimeoutStartSec=3600

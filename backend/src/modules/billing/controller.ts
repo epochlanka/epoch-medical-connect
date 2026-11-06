@@ -1,0 +1,198 @@
+import { Request, Response } from 'express';
+import * as service from './service';
+import { getOutstandingBalances } from './balances';
+import { closeDay as closeBusinessDay, getDayClose, listDayCloses, reopenDay as reopenBusinessDay } from './dayClose';
+import { streamInvoicePdf } from './pdf';
+import { ConflictError, NotFoundError, ValidationError } from './errors';
+import { respondWithServerError } from '../../errors';
+
+const actor = (req: Request) => req.user as any as { user_id: number; role: string };
+
+const handleError = (req: Request, res: Response, error: any) => {
+  if (error instanceof NotFoundError) return res.status(404).json({ message: error.message });
+  if (error instanceof ValidationError) return res.status(400).json({ message: error.message });
+  if (error instanceof ConflictError) return res.status(409).json({ message: error.message });
+  return respondWithServerError(req, res, error, 'billing');
+};
+
+export const create = async (req: Request, res: Response) => {
+  try {
+    const invoice = await service.createInvoice(req.body, actor(req));
+    res.status(201).json(invoice);
+  } catch (error) {
+    handleError(req, res, error);
+  }
+};
+
+export const getById = async (req: Request, res: Response) => {
+  try {
+    const invoice = await service.getInvoiceById(Number(req.params.invoiceId));
+    res.status(200).json(invoice);
+  } catch (error) {
+    handleError(req, res, error);
+  }
+};
+
+export const list = async (req: Request, res: Response) => {
+  try {
+    const { search, patientId, consultationId, status, type, from, to, page, limit } = req.query as any;
+    const result = await service.listInvoices({
+      search,
+      patientId,
+      consultationId: consultationId ? Number(consultationId) : undefined,
+      status,
+      type,
+      from: from ? new Date(from) : undefined,
+      to: to ? new Date(to) : undefined,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
+    res.status(200).json(result);
+  } catch (error) {
+    handleError(req, res, error);
+  }
+};
+
+export const stats = async (req: Request, res: Response) => {
+  try {
+    const result = await service.getInvoiceStats();
+    res.status(200).json(result);
+  } catch (error) {
+    handleError(req, res, error);
+  }
+};
+
+export const recordPayments = async (req: Request, res: Response) => {
+  try {
+    const invoice = await service.recordPayments(Number(req.params.invoiceId), req.body.payments, actor(req));
+    res.status(200).json(invoice);
+  } catch (error) {
+    handleError(req, res, error);
+  }
+};
+
+export const voidInvoice = async (req: Request, res: Response) => {
+  try {
+    const invoice = await service.voidInvoice(Number(req.params.invoiceId), req.body.reason, actor(req), req.body.refunds);
+    res.status(200).json(invoice);
+  } catch (error) {
+    handleError(req, res, error);
+  }
+};
+
+export const getPdf = async (req: Request, res: Response) => {
+  try {
+    const invoice = await service.getInvoiceById(Number(req.params.invoiceId));
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="INV-${new Date(invoice.created_at).getFullYear()}-${String(invoice.invoice_id).padStart(4, '0')}.pdf"`);
+    streamInvoicePdf(invoice, res);
+  } catch (error) {
+    handleError(req, res, error);
+  }
+};
+
+export const payments = async (req: Request, res: Response) => {
+  try {
+    const { search, method, invoiceStatus, from, to, page, limit } = req.query as any;
+    const result = await service.listPayments({
+      search,
+      method,
+      invoiceStatus,
+      from: from ? new Date(from) : undefined,
+      to: to ? new Date(to) : undefined,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
+    res.status(200).json(result);
+  } catch (error) {
+    handleError(req, res, error);
+  }
+};
+
+export const paymentsStats = async (req: Request, res: Response) => {
+  try {
+    const range = (req.query.range as any) || 'month';
+    res.status(200).json(await service.getPaymentsStats(range));
+  } catch (error) {
+    handleError(req, res, error);
+  }
+};
+
+export const reconciliation = async (req: Request, res: Response) => {
+  try {
+    const { date } = req.query as any;
+    const result = await service.getReconciliation(date ? new Date(date) : new Date());
+    res.status(200).json(result);
+  } catch (error) {
+    handleError(req, res, error);
+  }
+};
+
+export const outstanding = async (req: Request, res: Response) => {
+  try {
+    const { search, aging, sort, page, limit } = req.query as any;
+    res.status(200).json(await getOutstandingBalances({ search, aging, sort, page: page ? Number(page) : undefined, limit: limit ? Number(limit) : undefined }));
+  } catch (error) {
+    handleError(req, res, error);
+  }
+};
+
+export const dayClose = async (req: Request, res: Response) => {
+  try {
+    res.status(200).json(await getDayClose(String(req.query.date)));
+  } catch (error) {
+    handleError(req, res, error);
+  }
+};
+
+export const closeDay = async (req: Request, res: Response) => {
+  try {
+    res.status(201).json(await closeBusinessDay(req.body, actor(req)));
+  } catch (error) {
+    handleError(req, res, error);
+  }
+};
+
+export const reopenDay = async (req: Request, res: Response) => {
+  try {
+    res.status(200).json(await reopenBusinessDay(String(req.params.date), req.body.reason, actor(req)));
+  } catch (error) {
+    handleError(req, res, error);
+  }
+};
+
+export const dayCloseHistory = async (req: Request, res: Response) => {
+  try {
+    const { page, limit } = req.query as any;
+    res.status(200).json(await listDayCloses({ page: page ? Number(page) : undefined, limit: limit ? Number(limit) : undefined }));
+  } catch (error) {
+    handleError(req, res, error);
+  }
+};
+
+export const unbilledDispenses = async (req: Request, res: Response) => {
+  try {
+    const rows = await service.findUnbilledDispenses();
+    res.status(200).json({
+      count: rows.length,
+      data: rows.map((d) => ({
+        dispenseId: d.dispense_id,
+        prescriptionId: d.item.prescription.prescription_id,
+        consultationId: d.item.prescription.consultation_id,
+        qty: d.qty,
+        amount: d.qty * d.unit_price,
+        dispensedAt: d.dispensed_at,
+      })),
+    });
+  } catch (error) {
+    handleError(req, res, error);
+  }
+};
+
+export const reconcile = async (req: Request, res: Response) => {
+  try {
+    res.status(200).json(await service.reconcileBilling());
+  } catch (error) {
+    handleError(req, res, error);
+  }
+};

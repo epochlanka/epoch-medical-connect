@@ -1,0 +1,244 @@
+import { Router, Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
+import multer from 'multer';
+import { UPLOADS_DIR } from '../../config/paths';
+import { enforceUploadedFileType } from '../../middlewares/uploadValidation';
+import path from 'path';
+import fs from 'fs';
+import { validate } from '../../middlewares/validate';
+import { requireAuth, requireRole } from '../../middlewares/auth';
+import * as controller from './controller';
+
+const router = Router();
+
+router.use(requireAuth);
+
+const READ_ROLES = ['Admin', 'Receptionist', 'Doctor', 'Pharmacist'];
+const WRITE_ROLES = ['Admin', 'Receptionist'];
+const ALLERGY_WRITE_ROLES = ['Admin', 'Receptionist', 'Doctor'];
+
+// ---- Photo upload (Multer) --------------------------------------------------
+
+const uploadsDir = path.join(UPLOADS_DIR, 'patients');
+fs.mkdirSync(uploadsDir, { recursive: true });
+
+const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadsDir),
+    // Extension is decided after the content is inspected (enforceUploadedFileType) — never from
+    // the client-supplied filename.
+    filename: (req, _file, cb) => cb(null, `${req.params.patientId}-${Date.now()}.tmp`),
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (!ALLOWED_PHOTO_TYPES.includes(file.mimetype)) {
+      return cb(new Error('Only JPEG, PNG, or WEBP images are allowed'));
+    }
+    cb(null, true);
+  },
+});
+
+const uploadPhotoMiddleware = (req: Request, res: Response, next: NextFunction) => {
+  upload.single('photo')(req, res, (err: unknown) => {
+    if (err) return res.status(400).json({ message: err instanceof Error ? err.message : 'Upload failed' });
+    enforceUploadedFileType(['jpeg', 'png', 'webp'])(req, res, next);
+  });
+};
+
+// ---- Validation schemas ------------------------------------------------------
+
+const patientIdParams = z.object({ patientId: z.string().min(1) });
+
+const registerSchema = z.object({
+  body: z
+    .object({
+      full_name: z.string().min(1, 'Full name is required'),
+      dob: z.coerce.date(),
+      gender: z.string().min(1, 'Gender is required'),
+      nic: z.string().min(1).optional(),
+      guardian_nic: z.string().min(1).optional(),
+      phone: z.string().optional(),
+      blood_group: z.string().optional(),
+      allergies: z.string().optional(),
+      nationality: z.string().optional(),
+      marital_status: z.string().optional(),
+      occupation: z.string().optional(),
+      employer_school: z.string().optional(),
+      relationship_to_head: z.string().optional(),
+      chronic_conditions: z.string().optional(),
+      current_medications: z.string().optional(),
+      emergency_contact_name: z.string().optional(),
+      emergency_contact_phone: z.string().optional(),
+      family_id: z.number().int().positive().optional(),
+      new_family: z
+        .object({
+          family_name: z.string().min(1),
+          address: z.string().optional(),
+          contact_no: z.string().optional(),
+        })
+        .optional(),
+    })
+    .refine((data) => !!data.nic || !!data.guardian_nic, {
+      message: 'Either nic or guardian_nic is required (minors without their own NIC use guardian_nic + dob)',
+      path: ['nic'],
+    })
+    .refine((data) => Boolean(data.family_id) !== Boolean(data.new_family), {
+      message: 'Provide exactly one of family_id (existing family) or new_family',
+      path: ['family_id'],
+    }),
+});
+
+// Front desk check-in: the fewest fields that make a usable record. Blank optional fields arrive
+// as "" from the form and are treated as absent.
+const blankToUndefined = (v: unknown) => (typeof v === 'string' && v.trim() === '' ? undefined : v);
+const quickRegisterSchema = z.object({
+  body: z
+    .object({
+      full_name: z.string().trim().min(1, 'Full name is required'),
+      gender: z.enum(['Male', 'Female', 'Other'], { message: 'Gender is required' }),
+      dob: z.preprocess(blankToUndefined, z.coerce.date().refine((d) => d <= new Date(), 'Date of birth cannot be in the future').optional()),
+      age: z.preprocess(blankToUndefined, z.coerce.number().int().min(0).max(130).optional()),
+      phone: z.preprocess(blankToUndefined, z.string().trim().optional()),
+      nic: z.preprocess(blankToUndefined, z.string().trim().optional()),
+      // Blank means none known: the doctor's screens treat any text here as an allergy.
+      allergies: z.preprocess(blankToUndefined, z.string().trim().max(500).optional()),
+      family_id: z.number().int().positive().optional(),
+    })
+    .refine((data) => (data.dob === undefined) !== (data.age === undefined), {
+      message: 'Give either a date of birth or an age',
+      path: ['age'],
+    }),
+});
+
+const checkDuplicateSchema = z.object({
+  query: z
+    .object({
+      nic: z.string().optional(),
+      guardianNic: z.string().optional(),
+      dob: z.coerce.date().optional(),
+    })
+    .refine((data) => !!data.nic || (!!data.guardianNic && !!data.dob), {
+      message: 'Provide either nic, or guardianNic together with dob',
+    }),
+});
+
+const listSchema = z.object({
+  query: z.object({
+    search: z.string().optional(),
+    status: z.enum(['active', 'inactive', 'all']).optional(),
+    gender: z.string().optional(),
+    bloodGroup: z.string().optional(),
+    ageFrom: z.coerce.number().int().min(0).optional(),
+    ageTo: z.coerce.number().int().min(0).optional(),
+    familyId: z.coerce.number().int().positive().optional(),
+    page: z.coerce.number().int().positive().optional(),
+    limit: z.coerce.number().int().positive().optional(),
+  }),
+});
+
+const updateSchema = z.object({
+  params: patientIdParams,
+  body: z.object({
+    full_name: z.string().min(1).optional(),
+    phone: z.string().optional(),
+    blood_group: z.string().optional(),
+    allergies: z.string().optional(),
+    gender: z.string().optional(),
+    guardian_nic: z.string().optional(),
+    nationality: z.string().optional(),
+    marital_status: z.string().optional(),
+    occupation: z.string().optional(),
+    employer_school: z.string().optional(),
+    relationship_to_head: z.string().optional(),
+    chronic_conditions: z.string().optional(),
+    current_medications: z.string().optional(),
+    emergency_contact_name: z.string().optional(),
+    emergency_contact_phone: z.string().optional(),
+    family_id: z.number().int().positive().optional(),
+    reason: z.string().optional(),
+  }),
+});
+
+const allergiesSchema = z.object({
+  params: patientIdParams,
+  body: z.object({ allergies: z.string() }),
+});
+
+const statusSchema = z.object({
+  params: patientIdParams,
+  body: z.object({ is_active: z.boolean(), reason: z.string().optional() }),
+});
+
+const historySchema = z.object({
+  params: patientIdParams,
+  query: z.object({
+    from: z.coerce.date().optional(),
+    to: z.coerce.date().optional(),
+    types: z.string().optional(),
+  }),
+});
+
+const auditLogSchema = z.object({
+  params: patientIdParams,
+  query: z.object({
+    page: z.coerce.number().int().positive().optional(),
+    limit: z.coerce.number().int().positive().optional(),
+  }),
+});
+
+const patientIdParamsSchema = z.object({ params: patientIdParams });
+
+const duplicatesListSchema = z.object({
+  query: z.object({
+    status: z.enum(['Pending', 'Dismissed', 'Merged', 'All']).optional(),
+    search: z.string().optional(),
+    matchBand: z.enum(['very-high', 'high', 'moderate', 'low', 'all']).optional(),
+    dateFrom: z.coerce.date().optional(),
+    dateTo: z.coerce.date().optional(),
+    reviewedBy: z.string().optional(),
+    page: z.coerce.number().int().positive().optional(),
+    limit: z.coerce.number().int().positive().optional(),
+  }),
+});
+
+const flagIdParams = z.object({ flagId: z.coerce.number().int().positive() });
+const dismissSchema = z.object({ params: flagIdParams });
+const mergeSchema = z.object({ params: flagIdParams, body: z.object({ primaryPatientId: z.string().min(1) }) });
+
+// ---- Routes -------------------------------------------------------------------
+// Static-segment routes (/check-duplicate, /duplicates) must be registered before
+// the generic /:patientId route or Express will swallow them as a patient id.
+
+router.get('/', requireRole(READ_ROLES), validate(listSchema), controller.list);
+router.get('/stats', requireRole(READ_ROLES), controller.stats);
+// Quick find by patient number, phone, NIC or name — the search box at the top of every screen.
+router.get('/lookup', requireRole(READ_ROLES), validate(z.object({ query: z.object({ q: z.string().max(100), limit: z.coerce.number().int().min(1).max(20).optional() }) })), controller.lookup);
+router.get('/check-duplicate', requireRole(WRITE_ROLES), validate(checkDuplicateSchema), controller.checkDuplicate);
+// Live "already registered" warnings under the phone and NIC boxes of the registration forms.
+router.get(
+  '/check-identifiers',
+  requireRole(WRITE_ROLES),
+  validate(z.object({ query: z.object({ phone: z.string().max(40).optional(), nic: z.string().max(20).optional(), familyId: z.coerce.number().int().positive().optional() }) })),
+  controller.checkIdentifiers
+);
+
+router.get('/duplicates', requireRole(WRITE_ROLES), validate(duplicatesListSchema), controller.listDuplicates);
+router.get('/duplicates/stats', requireRole(WRITE_ROLES), controller.duplicateStats);
+router.post('/duplicates/:flagId/dismiss', requireRole(WRITE_ROLES), validate(dismissSchema), controller.dismissDuplicate);
+router.post('/duplicates/:flagId/merge', requireRole(WRITE_ROLES), validate(mergeSchema), controller.mergeDuplicate);
+
+router.post('/', requireRole(WRITE_ROLES), validate(registerSchema), controller.register);
+router.post('/quick', requireRole(WRITE_ROLES), validate(quickRegisterSchema), controller.quickRegister);
+
+router.get('/:patientId', requireRole(READ_ROLES), validate(patientIdParamsSchema), controller.getById);
+router.put('/:patientId', requireRole(WRITE_ROLES), validate(updateSchema), controller.update);
+router.patch('/:patientId/allergies', requireRole(ALLERGY_WRITE_ROLES), validate(allergiesSchema), controller.updateAllergies);
+router.patch('/:patientId/status', requireRole(WRITE_ROLES), validate(statusSchema), controller.setStatus);
+router.post('/:patientId/photo', requireRole(WRITE_ROLES), validate(patientIdParamsSchema), uploadPhotoMiddleware, controller.uploadPhoto);
+router.get('/:patientId/history', requireRole(READ_ROLES), validate(historySchema), controller.history);
+router.get('/:patientId/history/pdf', requireRole(READ_ROLES), validate(historySchema), controller.historyPdf);
+router.get('/:patientId/audit-log', requireRole(READ_ROLES), validate(auditLogSchema), controller.auditLog);
+
+export default router;

@@ -1,0 +1,16 @@
+## Runs heartbeat.sh once. Triggered on a schedule by epoch-heartbeat.timer, not run directly.
+## Needs HEARTBEAT_URL in clinic.env — a ping URL from your monitor (e.g. https://healthchecks.io).
+##
+## On the clinic machine, from inside the install folder:
+##   sudo cp epoch-heartbeat.service epoch-heartbeat.timer /etc/systemd/system/
+##   sudo sed -i "s#__INSTALL_PATH__#$(pwd)#" /etc/systemd/system/epoch-heartbeat.service
+##   sudo systemctl daemon-reload
+##   sudo systemctl enable --now epoch-heartbeat.timer
+
+[Unit]
+Description=E-Poch Medical System heartbeat ping (one-shot, run by epoch-heartbeat.timer)
+
+[Service]
+Type=oneshot
+WorkingDirectory=__INSTALL_PATH__
+ExecStart=__INSTALL_PATH__/heartbeat.sh

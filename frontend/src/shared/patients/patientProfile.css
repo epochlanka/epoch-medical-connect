@@ -1,0 +1,98 @@
+/* ---- Patient profile (shared by every workspace) ---- */
+.pp { max-width: 1320px; margin: 0 auto; padding: 4px 0 24px; color: var(--ink); font-size: 15px; }
+.pp-muted { margin: 0; color: var(--ink-soft); font-size: 14px; }
+.pp-empty { margin: 0; padding: 24px; text-align: center; color: var(--ink-soft); border: 1px dashed var(--line-strong); border-radius: 12px; }
+.pp-error { padding: 14px; border-radius: 10px; background: var(--danger-wash); color: var(--danger); font-weight: 600; }
+
+.pp-head {
+  display: grid; grid-template-columns: 64px minmax(0, 1fr) auto auto; align-items: center; gap: 18px;
+  padding: 18px 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface);
+}
+.pp-avatar { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; object-fit: cover; background: var(--accent-wash); color: var(--accent); font-size: 22px; font-weight: 800; }
+.pp-who h1 { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 4px; font-size: 24px; color: var(--ink); }
+.pp-who p { margin: 0; color: var(--ink-muted); font-size: 15px; }
+.pp-tag { padding: 2px 8px; border-radius: 999px; background: var(--surface-sunken); color: var(--ink-soft); font-size: 12px; font-weight: 700; }
+.pp-number {
+  display: flex; flex-direction: column; align-items: center; padding: 8px 18px; border-radius: 12px;
+  border: 2px solid var(--accent-line); background: var(--accent-wash); text-align: center;
+}
+.pp-number span { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); }
+.pp-number strong { font-size: 32px; line-height: 1.1; color: var(--accent); font-variant-numeric: tabular-nums; }
+.pp-number small { font-size: 12px; color: var(--ink-soft); }
+.pp-actions { display: flex; flex-direction: column; gap: 8px; }
+.pp-btn {
+  padding: 9px 14px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface);
+  color: var(--ink); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.pp-btn:hover { background: var(--surface-wash); }
+.pp-btn.primary { border-color: var(--accent); background: var(--accent); color: var(--accent-on); }
+.pp-btn.primary:hover { background: var(--accent-hover); }
+.pp-link { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
+.pp-link:hover { text-decoration: underline; }
+
+.pp-allergy { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 12px 0; padding: 12px 16px; border-radius: 12px; border: 1px solid; font-size: 15px; }
+.pp-allergy.is-allergic { background: var(--danger-wash); border-color: var(--danger-line); color: var(--danger); }
+.pp-allergy.is-allergic span { font-weight: 700; }
+.pp-allergy.is-clear { background: var(--ok-wash); border-color: var(--ok-line); color: var(--ok); }
+
+.pp-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
+.pp-main { min-width: 0; }
+.pp-stack { display: flex; flex-direction: column; gap: 14px; }
+.pp-tabs { display: flex; gap: 4px; margin-bottom: 14px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.pp-tabs button {
+  padding: 10px 14px; border: 0; border-bottom: 3px solid transparent; background: none;
+  color: var(--ink-muted); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.pp-tabs button.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.pp-card { padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.pp-rail { display: flex; flex-direction: column; gap: 12px; }
+.pp-rail h2 { margin: 0 0 8px; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); }
+.pp-strong { margin: 0; font-size: 17px; font-weight: 700; }
+.pp-note { margin: 8px 0 0; font-size: 13px; color: var(--ink-muted); }
+.pp-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.pp-chips li { padding: 4px 10px; border-radius: 8px; background: var(--surface-sunken); font-size: 14px; font-weight: 600; }
+.pp-chips li.is-outside { background: var(--outside-wash); color: var(--outside); }
+.pp-family { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.pp-family li { display: flex; flex-direction: column; }
+.pp-family span { font-size: 13px; color: var(--ink-soft); }
+
+.pp-fields { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 24px; }
+.pp-field dt { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); }
+.pp-field dd { margin: 2px 0 0; font-size: 15px; color: var(--ink); }
+
+.pp-table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.pp-table th, .pp-table td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; font-size: 14px; vertical-align: top; }
+.pp-table th { background: var(--surface-wash); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); }
+.pp-num { text-align: right !important; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pp-row-actions { white-space: nowrap; display: flex; gap: 12px; }
+.pp-status { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--surface-sunken); font-size: 12px; font-weight: 700; color: var(--ink-muted); }
+.pp-status.s-completed, .pp-status.s-collected, .pp-status.s-paid { background: var(--ok-wash); color: var(--ok); }
+.pp-status.s-pending, .pp-status.s-unpaid, .pp-status.s-report-received { background: var(--warn-wash); color: var(--warn); }
+.pp-status.s-external { background: var(--outside-wash); color: var(--outside); }
+.pp-status.s-cancelled, .pp-status.s-voided { background: var(--danger-wash); color: var(--danger); }
+
+/* The shared history widgets were written for the doctor workspace; give them their basic look
+   here too, so they read the same at reception and in the pharmacy. */
+.pp .card { padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.pp .card-empty { padding: 20px; text-align: center; color: var(--ink-soft); }
+.pp .pat-table { width: 100%; border-collapse: collapse; }
+.pp .pat-table th, .pp .pat-table td { padding: 9px 10px; border-bottom: 1px solid var(--line); text-align: left; font-size: 14px; }
+.pp .pat-table th { font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--ink-soft); }
+.pp .pat-select { padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: 8px; font: inherit; }
+.pp .pth-side-card-title { margin-bottom: 8px; font-size: 13px; font-weight: 700; text-transform: uppercase; color: var(--ink-soft); }
+.pp .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; background: var(--surface-sunken); }
+.pp .badge-green { background: var(--ok-wash); color: var(--ok); }
+.pp .badge-red { background: var(--danger-wash); color: var(--danger); }
+
+@media (max-width: 1100px) {
+  .pp-layout { grid-template-columns: 1fr; }
+  .pp-head { grid-template-columns: 56px minmax(0, 1fr); }
+  .pp-number, .pp-actions { grid-column: 1 / -1; }
+  .pp-number { flex-direction: row; gap: 10px; justify-content: center; }
+  .pp-actions { flex-direction: row; flex-wrap: wrap; }
+}
+@media (max-width: 640px) {
+  .pp-fields { grid-template-columns: 1fr; }
+}
+.pp-family .pp-link { align-self: flex-start; text-align: left; }

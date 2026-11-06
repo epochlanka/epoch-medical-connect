@@ -1,0 +1,177 @@
+import express, { Request, Response, NextFunction } from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import pinoHttp from 'pino-http';
+import dotenv from 'dotenv';
+import passport from 'passport';
+import { randomBytes } from 'crypto';
+
+import { logger, httpSerializers, healthHandler, notFoundHandler, globalErrorHandler } from './errors';
+import { uploadsHandler } from './middlewares/uploadsAccess';
+
+import authRouter from './modules/auth/router';
+import dashboardRouter from './modules/dashboard/router';
+import patientsRouter from './modules/patients/router';
+import familiesRouter from './modules/families/router';
+import medicinesRouter from './modules/medicines/router';
+import consultationsRouter from './modules/consultations/router';
+import prescriptionsRouter from './modules/prescriptions/router';
+import pharmacyRouter from './modules/pharmacy/router';
+import inventoryRouter from './modules/inventory/router';
+import suppliersRouter from './modules/suppliers/router';
+import billingRouter from './modules/billing/router';
+import reportsRouter from './modules/reports/router';
+import settingsRouter from './modules/settings/router';
+import securityRouter from './modules/security/router';
+import { appointmentsRouter } from './modules/appointments/router';
+import icd11Router from './modules/icd11/router';
+import labTestOrdersRouter from './modules/labTestOrders/router';
+import externalMedicinesRouter from './modules/external-medicines/router';
+import lettersRouter from './modules/letters/router';
+
+// Load environment variables
+dotenv.config();
+
+const app = express();
+
+// Security HTTP headers
+app.use(helmet());
+
+// The web application shares this API and authenticates with a credentialed HttpOnly cookie.
+// Production stays allow-list only. In development, accept loopback on any port because Vite
+// selects the next available port when its preferred one is already occupied.
+const developmentOrigins = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5173';
+// Deployment shortcut: SITE_HOST is the address workstations type into the browser (the server's
+// LAN IP or hostname). There is one application, always on 5173, so its origin follows from that —
+// nobody has to hand-maintain a FRONTEND_URLS list. (It used to be four portals on 5173-5176; they
+// are now workspaces inside one app, so only the one origin is granted.) `localhost` is included
+// for the browser on the server itself; loopback names point at the machine running the browser,
+// never at this server from another workstation, so they grant nothing remotely. FRONTEND_URLS
+// still works for anything unusual (extra hostnames, a TLS front end).
+const APP_PORT = 5173;
+const siteHostOrigins = (process.env.SITE_HOST
+  ? [process.env.SITE_HOST, 'localhost', '127.0.0.1']
+  : ['localhost', '127.0.0.1'])
+  .map((host) => `http://${host}:${APP_PORT}`)
+  .join(',');
+const allowedOrigins = new Set(`${process.env.FRONTEND_URLS || developmentOrigins},${process.env.FRONTEND_URL || ''},${siteHostOrigins}`
+  .split(',')
+  .map((origin) => origin.trim().replace(/\/$/, ''))
+  .filter(Boolean));
+
+const isAllowedDevelopmentOrigin = (origin: string) => {
+  if (process.env.NODE_ENV === 'production') return false;
+  try {
+    const url = new URL(origin);
+    if (url.protocol !== 'http:') return false;
+
+    const hostname = url.hostname.toLowerCase();
+    const isLoopback = ['localhost', '127.0.0.1', '[::1]'].includes(hostname);
+    const isPrivateIpv4 = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(hostname);
+    const isPrivateIpv6 = /^\[(fc|fd|fe8|fe9|fea|feb)/.test(hostname);
+    const isLocalHostname = !hostname.includes('.') || hostname.endsWith('.local');
+
+    return isLoopback || isPrivateIpv4 || isPrivateIpv6 || isLocalHostname;
+  } catch {
+    return false;
+  }
+};
+
+app.use(
+  cors({
+    credentials: true,
+    maxAge: 600, // portals send a custom header on background polls; let browsers cache the preflight
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.has(origin.replace(/\/$/, '')) || isAllowedDevelopmentOrigin(origin)) {
+        return callback(null, true);
+      }
+      // Omitting CORS headers lets the browser reject the request without turning a routine
+      // policy denial into a server exception, error alert, or misleading HTTP 500.
+      return callback(null, false);
+    },
+  })
+);
+
+// Parse JSON request body
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Health probe — no auth, no rate limit, no logging noise. Safe for Docker HEALTHCHECK / monitors.
+app.get('/health', healthHandler);
+
+// Request logging (shared pino instance; every request gets a REQ-XXXXXXXX id that also appears
+// in any error report generated for it).
+app.use(
+  pinoHttp({
+    logger,
+    serializers: httpSerializers,
+    genReqId: (req, res) => {
+      const id = `REQ-${randomBytes(4).toString('hex').toUpperCase()}`;
+      res.setHeader('X-Request-Id', id);
+      return id;
+    },
+  })
+);
+
+// Rate limiting
+// All portals (admin, doctor, receptionist, pharmacist) share one backend, so on a single
+// dev machine they all count against the same IP's budget — keep this generous enough for
+// several portals polling simultaneously while still guarding against abuse.
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 2000, // Limit each IP to 2000 requests per `window` (here, per 15 minutes)
+  message: 'Too many requests from this IP, please try again after 15 minutes',
+});
+app.use('/api', limiter);
+
+// Initialize Passport
+app.use(passport.initialize());
+
+// Uploaded files. Patient photos, consultation attachments and lab reports are PHI, so they are
+// served only to an authenticated session with an appropriate role (see middlewares/uploadsAccess.ts);
+// letter templates and issued letters are never served here at all.
+app.use('/uploads', uploadsHandler);
+
+// Setup API Routes
+app.use('/api/v1/auth', authRouter);
+app.use('/api/v1/dashboard', dashboardRouter);
+app.use('/api/v1/patients', patientsRouter);
+app.use('/api/v1/families', familiesRouter);
+app.use('/api/v1/medicines', medicinesRouter);
+app.use('/api/v1/consultations', consultationsRouter);
+app.use('/api/v1/prescriptions', prescriptionsRouter);
+app.use('/api/v1/pharmacy', pharmacyRouter);
+app.use('/api/v1/inventory', inventoryRouter);
+app.use('/api/v1/suppliers', suppliersRouter);
+app.use('/api/v1/invoices', billingRouter);
+app.use('/api/v1/reports', reportsRouter);
+app.use('/api/v1/settings', settingsRouter);
+app.use('/api/v1/security', securityRouter);
+app.use('/api/v1/appointments', appointmentsRouter);
+app.use('/api/v1/icd11', icd11Router);
+app.use('/api/v1/lab-test-orders', labTestOrdersRouter);
+app.use('/api/v1/external-medicines', externalMedicinesRouter);
+app.use('/api/v1/letters', lettersRouter);
+
+// Deliberate-error endpoints for testing the error pipeline. OFF unless explicitly enabled and
+// never in production (see backend/src/errors/diagnostics.ts).
+if (process.env.ENABLE_ERROR_TEST_ROUTES === 'true' && process.env.NODE_ENV !== 'production') {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { diagnosticsRouter } = require('./errors/diagnostics');
+  app.use('/api/v1/_diagnostics', diagnosticsRouter);
+  logger.warn('Error test routes are ENABLED at /api/v1/_diagnostics — disable ENABLE_ERROR_TEST_ROUTES in production');
+}
+
+app.get('/api/health', (req: Request, res: Response) => {
+  res.status(200).json({ status: 'ok', message: 'E-Poch Medical System API is running' });
+});
+
+// 404 for any unmatched route, then the single centralized error handler. Every error that a
+// controller forwards with `next(err)` — or that a module's `respondWithServerError` routes —
+// is classified, given an Error ID when unexpected, logged with full context, and alerted to
+// the admin (deduplicated). Stack traces never leave the server.
+app.use(notFoundHandler);
+app.use(globalErrorHandler);
+
+export default app;

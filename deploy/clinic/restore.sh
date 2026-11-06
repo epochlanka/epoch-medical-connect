@@ -1,0 +1,129 @@
+#!/bin/sh
+# Recovery from a backup. Two modes:
+#
+#   ./restore.sh --drill  <backup> [--target-url postgresql://...]
+#       Restores into a SEPARATE, EMPTY database and compares it against the backup. Touches nothing
+#       live. Do this on a schedule (and after any change to how backups are made) — a backup is only
+#       proven by restoring it. Refuses to run if the target is the live database.
+#
+#   ./restore.sh --live   <backup>
+#       Real disaster recovery. Takes a safety dump of what is there now, STOPS the application,
+#       restores the database inside ONE transaction (all-or-nothing — a failure leaves the current
+#       data untouched, never a half-restored database), restores the uploaded files, restarts, and
+#       runs the security check. Requires typing a confirmation phrase.
+#
+# <backup> is either:
+#   - a file downloaded from Settings > Backups (backup-*.tar: database + uploads together), or
+#   - a pair made by backup.sh:  "database-<ts>.dump[.enc],uploads-<ts>.tar.gz[.enc]"
+#     (comma-separated, no spaces). Encrypted (.enc) files need BACKUP_PASSPHRASE_FILE in clinic.env.
+set -eu
+# Runs from the clinic install folder (beside docker-compose.yml and clinic.env).
+cd "$(dirname "$0")"
+COMPOSE_FILE=docker-compose.yml; APP_SERVICE=epoch-medical; UPLOADS_PARENT=data; ENV_FILE=clinic.env
+[ -f "$ENV_FILE" ] && { set -a; . "./$ENV_FILE"; set +a; }
+COMPOSE="docker compose -f $COMPOSE_FILE"
+
+MODE="${1:-}"; BACKUP="${2:-}"; TARGET_URL=""
+[ "${3:-}" = "--target-url" ] && TARGET_URL="${4:-}"
+case "$MODE" in --drill|--live) ;; *) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;; esac
+[ -n "$BACKUP" ] || { echo "Missing <backup>." >&2; exit 2; }
+
+STAGE="$(mktemp -d)"
+trap 'rm -rf "$STAGE"' EXIT
+START="$(date +%s)"
+
+decrypt_to() { # $1 = source file, $2 = destination
+  case "$1" in
+    *.enc) : "${BACKUP_PASSPHRASE_FILE:?This backup is encrypted: set BACKUP_PASSPHRASE_FILE in clinic.env}"
+           openssl enc -d -aes-256-cbc -pbkdf2 -pass "file:${BACKUP_PASSPHRASE_FILE}" < "$1" > "$2" ;;
+    *) cp "$1" "$2" ;;
+  esac
+}
+
+# ── Stage the backup as $STAGE/database.dump + $STAGE/uploads/ ─────────────────────────────────
+case "$BACKUP" in
+  *,*)
+    DB_SRC="${BACKUP%%,*}"; UP_SRC="${BACKUP#*,}"
+    decrypt_to "$DB_SRC" "$STAGE/database.dump"
+    decrypt_to "$UP_SRC" "$STAGE/uploads.tar.gz"
+    tar -xzf "$STAGE/uploads.tar.gz" -C "$STAGE" ;;
+  *.tar)
+    tar -xf "$BACKUP" -C "$STAGE" ;;
+  *) echo "Unrecognised backup: expected backup-*.tar or 'database-...,uploads-...'." >&2; exit 2 ;;
+esac
+[ -s "$STAGE/database.dump" ] || { echo "The backup contains no database.dump." >&2; exit 1; }
+[ -d "$STAGE/uploads" ] || mkdir "$STAGE/uploads"
+
+IMAGE="$($COMPOSE images -q "$APP_SERVICE" | head -n 1)"
+[ -n "$IMAGE" ] || { echo "The application image is not available (start the stack first)." >&2; exit 1; }
+tools() { docker run --rm --network host --entrypoint sh -v "$STAGE:/restore:ro" -e "PGCONNECT_TIMEOUT=30" "$@"; }
+
+host_of() { printf '%s' "$1" | sed -E 's#^[a-z]+://[^@]*@##; s#[:/?].*##'; }
+live_url="$(grep -E '^DIRECT_URL=' "$ENV_FILE" | head -n1 | cut -d= -f2-)"
+
+# ── DRILL ──────────────────────────────────────────────────────────────────────────────────────
+if [ "$MODE" = "--drill" ]; then
+  [ -n "$TARGET_URL" ] || { echo "--drill needs --target-url for an isolated EMPTY database (e.g. a throwaway local Postgres)." >&2; exit 2; }
+  if [ "$(host_of "$TARGET_URL")" = "$(host_of "$live_url")" ]; then
+    echo "REFUSING: the target is on the same database host as the live system. A drill must use a separate, isolated database." >&2; exit 1
+  fi
+
+  echo "Restoring into the isolated target..."
+  tools "$IMAGE" -c 'pg_restore --exit-on-error --single-transaction --no-owner --dbname "$1" /restore/database.dump' sh "$TARGET_URL"
+
+  echo "Checking the restored database..."
+  tools -e "DATABASE_URL=$TARGET_URL" -e "DIRECT_URL=$TARGET_URL" "$IMAGE" -c 'node scripts/check-db-security.js'
+  tools "$IMAGE" -c 'psql "$1" -Atc "select '"'"'users'"'"', count(*) from \"User\" union all select '"'"'patients'"'"', count(*) from \"Patient\" union all select '"'"'prescriptions'"'"', count(*) from \"Prescription\" union all select '"'"'invoices'"'"', count(*) from \"Invoice\" union all select '"'"'payments'"'"', count(*) from \"Payment\""' sh "$TARGET_URL" 2>/dev/null || true
+  echo "Uploaded files in the backup: $(find "$STAGE/uploads" -type f | wc -l)"
+  echo "Drill complete in $(( $(date +%s) - START ))s — this is your measured recovery time for a database of this size."
+  exit 0
+fi
+
+# ── LIVE ───────────────────────────────────────────────────────────────────────────────────────
+echo "This will REPLACE the live database and all uploaded files with the contents of:"
+echo "    $BACKUP"
+echo "The application will be stopped while this runs. Anything entered since that backup was taken"
+echo "will be lost (a safety copy of the current state is saved first)."
+printf 'Type RESTORE LIVE DATABASE to continue: '
+read -r CONFIRM
+[ "$CONFIRM" = "RESTORE LIVE DATABASE" ] || { echo "Cancelled."; exit 1; }
+
+TS="$(date +%Y%m%dT%H%M%S)"
+SAFETY="$UPLOADS_PARENT/backups/pre-restore-$TS.dump"
+mkdir -p "$UPLOADS_PARENT/backups"
+echo "Saving a safety dump of the CURRENT database to $SAFETY ..."
+$COMPOSE exec -T "$APP_SERVICE" sh -c 'pg_dump --format=custom "$DIRECT_URL"' > "$SAFETY"
+[ -s "$SAFETY" ] || { echo "Safety dump is empty — aborting before anything is changed." >&2; exit 1; }
+
+echo "Stopping the application..."
+$COMPOSE stop "$APP_SERVICE"
+
+echo "Restoring the database (single transaction: it either fully succeeds or changes nothing)..."
+if ! $COMPOSE run --rm --no-deps --entrypoint sh -v "$STAGE:/restore:ro" "$APP_SERVICE" -c \
+     'pg_restore --exit-on-error --single-transaction --clean --if-exists --no-owner --dbname "$DIRECT_URL" /restore/database.dump'; then
+  echo "RESTORE FAILED — the database was left exactly as it was. Restarting the application." >&2
+  $COMPOSE up -d
+  exit 1
+fi
+
+echo "Restoring uploaded files..."
+if [ -d "$UPLOADS_PARENT/uploads" ]; then mv "$UPLOADS_PARENT/uploads" "$UPLOADS_PARENT/uploads.before-restore-$TS"; fi
+cp -a "$STAGE/uploads" "$UPLOADS_PARENT/uploads"
+
+echo "Revoking every session (the restored database brings back old ones)..."
+$COMPOSE run --rm --no-deps --entrypoint sh "$APP_SERVICE" -c \
+  'node -e "const {PrismaClient}=require(\"@prisma/client\");const p=new PrismaClient();p.userSession.updateMany({where:{revoked_at:null},data:{revoked_at:new Date()}}).then(r=>{console.log(\"sessions revoked:\",r.count);return p.\$disconnect()})"'
+
+echo "Starting the application..."
+$COMPOSE up -d
+# Supabase-only check; a local PostgreSQL has no anon/authenticated roles to audit.
+if [ "${SKIP_DB_SECURITY_CHECK:-}" != "true" ]; then
+  $COMPOSE run --rm --no-deps --entrypoint sh "$APP_SERVICE" -c 'node scripts/check-db-security.js'
+fi
+
+echo
+echo "Restored in $(( $(date +%s) - START ))s."
+echo "  - Previous uploads kept at $UPLOADS_PARENT/uploads.before-restore-$TS ; previous database at $SAFETY"
+echo "  - Settings > Backups now lists the backups that existed AT THE RESTORED POINT IN TIME; backup files"
+echo "    made since then are still on disk in $UPLOADS_PARENT/backups but are not listed."
+echo "  - Everyone must sign in again."

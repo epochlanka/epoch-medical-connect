@@ -1,0 +1,17 @@
+/* ---- Patient Search history views ---- */
+
+.hv-current { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+.hv-label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.03em; }
+.hv-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.hv-chips span { padding: 4px 10px; border-radius: 8px; background: var(--ok-wash); color: var(--ok); font-size: 14px; font-weight: 600; }
+.hv-chips span.is-outside { background: var(--outside-wash); color: var(--outside); }
+.hv-filter { min-width: 260px; }
+.hv-muted { color: var(--ink-soft); font-size: 14px; margin: 0; }
+.hv-table td, .hv-table th { vertical-align: top; }
+.hv-table tr.is-outside td:first-child { box-shadow: inset 3px 0 var(--outside); }
+.hv-nowrap { white-space: nowrap; }
+.hv-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hv-num.is-abnormal { color: var(--danger); font-weight: 700; background: var(--danger-wash); }
+.hv-scroll { overflow-x: auto; }
+.pth-chip-row.medication.is-outside { background: var(--outside-wash); }
+.pth-chip-row.medication.is-outside .pth-chip-main { color: var(--outside); }

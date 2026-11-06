@@ -1,0 +1,49 @@
+# Dependency directories
+node_modules/
+newkey
+# Environment variables
+.env
+.env.*
+!.env.example
+clinic.env
+
+# Offline production image bundles
+deploy/transfer/
+deploy/releases/
+
+# Build output
+dist/
+build/
+
+# Prisma SQLite database
+*.db
+*.db-journal
+
+# User-uploaded files (patient photos, etc.)
+uploads/
+
+# Local SQLite backup dumps (Settings > Backup & Restore)
+backend/backups/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Audio and video media (video projects under docs/video keep their source, not their clips)
+*.wav
+*.mp3
+*.mp4
+*.mov
+*.webm
