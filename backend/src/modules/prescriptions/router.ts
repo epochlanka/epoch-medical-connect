@@ -25,6 +25,8 @@ const itemSchema = z.object({
   // The clinician deliberately entered qty rather than accepting the calculated one.
   qty_manual: z.boolean().optional(),
   external_qty: z.number().int().min(0).optional(),
+  // Taken long-term: stays on the ongoing-medicines list after the course runs out.
+  is_long_term: z.boolean().optional(),
 });
 
 const createSchema = z.object({
@@ -70,12 +72,25 @@ const statsSchema = z.object({
   }),
 });
 
+const stopSchema = z.object({
+  body: z.object({
+    patient_id: z.string().min(1),
+    medicine_name: z.string().trim().min(1).max(300),
+    reason: z.string().trim().max(500).optional(),
+    consultation_id: z.number().int().positive().optional(),
+  }),
+});
+const stopIdSchema = z.object({ params: z.object({ stopId: z.coerce.number().int().positive() }) });
+
 const contextParamsSchema = z.object({ params: z.object({ consultationId: z.coerce.number().int().positive() }) });
 
 // Static-segment routes (/context/:x, /stats) are registered before the generic '/:prescriptionId'
 // catch-all, per this codebase's route-ordering convention.
 router.get('/context/:consultationId', requireRole(READ_ROLES), validate(contextParamsSchema), controller.context);
 router.get('/stats', requireRole(READ_ROLES), controller.stats);
+// A doctor's "the patient no longer takes this" — hides the medicine from the ongoing list.
+router.post('/medication-stops', requireRole(WRITE_ROLES), validate(stopSchema), controller.stopMedication);
+router.delete('/medication-stops/:stopId', requireRole(WRITE_ROLES), validate(stopIdSchema), controller.undoStopMedication);
 
 router.get('/', requireRole(READ_ROLES), validate(listSchema), controller.list);
 router.post('/', requireRole(WRITE_ROLES), validate(createSchema), controller.create);

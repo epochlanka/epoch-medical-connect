@@ -45,7 +45,7 @@ const makeConsultation = async (forDoctorId: number, forDoctorToken: string) => 
   const appointment = await prisma.appointment.create({
     data: { patient_id: patient.patient_id, doctor_id: forDoctorId, scheduled_at: new Date(), status: 'Consulting', created_by: receptionist.user_id },
   });
-  const res = await request(app).post('/api/v1/consultations').set('Authorization', `Bearer ${forDoctorToken}`).send({ appointment_id: appointment.appointment_id });
+  const res = await request(app).post('/api/v1/consultations').set('Authorization', `Bearer ${forDoctorToken}`).send({ appointment_id: appointment.appointment_id, complaint: 'Test visit' });
   expect(res.status).toBe(201);
   return { consultationId: res.body.consultation_id as number, patient };
 };

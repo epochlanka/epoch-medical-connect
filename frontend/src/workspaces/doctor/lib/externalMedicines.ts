@@ -15,6 +15,7 @@ export interface ExternalMedicineInput {
   quantity: number;
   quantity_unit: string;
   instructions?: string;
+  is_long_term?: boolean;
 }
 
 export interface ExternalMedicine {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { useWorkspaceNavigate as useNavigate } from '../../../../app/WorkspaceContext';
@@ -23,6 +23,7 @@ import type { LabTestOrder } from '../../lib/labTestOrders';
 import { listActiveLetterTemplates, previewLetter, issueLetter, listIssuedLettersForPatient, printIssuedLetterAgain } from '../../lib/letters';
 import type { LetterTemplate, IssuedLetterSummary } from '../../lib/letters';
 import AmendModal from './AmendModal';
+import AiSummaryPanel from '../../components/AiSummaryPanel';
 import AddLabTestModal from '../labTestOrders/AddLabTestModal';
 import MarkReceivedModal from '../labTestOrders/MarkReceivedModal';
 import LabResultModal from '../labTestOrders/LabResultModal';
@@ -116,6 +117,35 @@ const emptyForm: FormState = {
   notes: '',
   allergies_ack: false,
   vitals: { bp_systolic: '', bp_diastolic: '', temp: '', pulse: '', respiratory_rate: '', spo2: '', weight: '', height: '' },
+};
+
+// The form as stored on the server (or, before the first save, as reception left it) — used to
+// load the page and as the baseline autosave compares against, so opening a visit saves nothing.
+const formFromContext = (context: Awaited<ReturnType<typeof getConsultationContext>>): FormState => {
+  const c = context.consultation;
+  return {
+    // Until the doctor writes their own, start from what the patient told reception.
+    complaint: c?.complaint || context.appointment.reason || '',
+    history_of_present_illness: c?.history_of_present_illness ?? '',
+    examination_findings: c?.examination_findings ?? '',
+    medical_history: c?.medicalHistory ?? [],
+    diagnoses: [
+      ...(c?.diagnosis ? [{ code: c.icd10_code || null, title: c.diagnosis }] : []),
+      ...(c?.additionalDiagnoses ?? []),
+    ],
+    notes: c?.notes ?? '',
+    allergies_ack: c?.allergies_ack ?? false,
+    vitals: {
+      bp_systolic: c?.vitals?.bp_systolic?.toString() ?? '',
+      bp_diastolic: c?.vitals?.bp_diastolic?.toString() ?? '',
+      temp: c?.vitals?.temp?.toString() ?? '',
+      pulse: c?.vitals?.pulse?.toString() ?? '',
+      respiratory_rate: c?.vitals?.respiratory_rate?.toString() ?? '',
+      spo2: c?.vitals?.spo2?.toString() ?? '',
+      weight: c?.vitals?.weight?.toString() ?? '',
+      height: c?.vitals?.height?.toString() ?? '',
+    },
+  };
 };
 
 const numOrUndefined = (s: string) => (s.trim() === '' ? undefined : Number(s));
@@ -249,30 +279,79 @@ const Workspace = ({ appointmentId }: { appointmentId: number }) => {
     setConsultationId(c?.consultation_id ?? null);
     setFollowUpDate(c?.follow_up_date ? c.follow_up_date.slice(0, 10) : '');
     setDiagnosisQuery('');
-    setForm({
-      // Until the doctor writes their own, start from what the patient told reception.
-      complaint: c?.complaint || context.appointment.reason || '',
-      history_of_present_illness: c?.history_of_present_illness ?? '',
-      examination_findings: c?.examination_findings ?? '',
-      medical_history: c?.medicalHistory ?? [],
-      diagnoses: [
-        ...(c?.diagnosis ? [{ code: c.icd10_code || null, title: c.diagnosis }] : []),
-        ...(c?.additionalDiagnoses ?? []),
-      ],
-      notes: c?.notes ?? '',
-      allergies_ack: c?.allergies_ack ?? false,
-      vitals: {
-        bp_systolic: c?.vitals?.bp_systolic?.toString() ?? '',
-        bp_diastolic: c?.vitals?.bp_diastolic?.toString() ?? '',
-        temp: c?.vitals?.temp?.toString() ?? '',
-        pulse: c?.vitals?.pulse?.toString() ?? '',
-        respiratory_rate: c?.vitals?.respiratory_rate?.toString() ?? '',
-        spo2: c?.vitals?.spo2?.toString() ?? '',
-        weight: c?.vitals?.weight?.toString() ?? '',
-        height: c?.vitals?.height?.toString() ?? '',
-      },
-    });
+    setForm(formFromContext(context));
+    createdIdRef.current = null;
   }, [context]);
+
+  // Autosave. The assessment used to be saved only by Save draft / Prescribe / Order tests /
+  // Finish, so a reload, a sidebar click or a closed tab silently lost everything typed. It is now
+  // saved to the server ~2 s after the doctor stops typing. Opening a visit saves nothing: the form
+  // is compared with what was loaded, and only a real change is sent. While a change is unsaved,
+  // leaving the page asks for confirmation.
+  const persistRef = useRef<(() => Promise<number>) | null>(null);
+  const createdIdRef = useRef<number | null>(null);
+  const creatingRef = useRef<Promise<number> | null>(null);
+  const lastSavedRef = useRef<string | null>(null);
+  const autoSavingRef = useRef(false);
+  const [autoSave, setAutoSave] = useState<{ state: 'idle' | 'pending' | 'saving' | 'saved' | 'error'; at?: Date }>({ state: 'idle' });
+  const [autoSaveTick, setAutoSaveTick] = useState(0);
+  const snapshot = JSON.stringify({ form, followUpDate });
+  const baseline = useMemo(
+    () => (context ? JSON.stringify({ form: formFromContext(context), followUpDate: context.consultation?.follow_up_date ? context.consultation.follow_up_date.slice(0, 10) : '' }) : null),
+    [context]
+  );
+  const autoSaveAllowed = !!context && context.consultation?.status !== 'Finalized' && (context.appointment.status === 'Consulting' || !!context.consultation);
+  useEffect(() => {
+    lastSavedRef.current = baseline;
+  }, [baseline]);
+  useEffect(() => {
+    if (!autoSaveAllowed || snapshot === lastSavedRef.current) {
+      setAutoSave((a) => (a.state === 'pending' ? { state: 'idle' } : a));
+      return;
+    }
+    setAutoSave((a) => (a.state === 'pending' ? a : { ...a, state: 'pending' }));
+    const t = setTimeout(async () => {
+      if (!persistRef.current || autoSavingRef.current) return;
+      autoSavingRef.current = true;
+      setAutoSave({ state: 'saving' });
+      try {
+        await persistRef.current();
+        lastSavedRef.current = snapshot;
+        setAutoSave({ state: 'saved', at: new Date() });
+      } catch {
+        setAutoSave({ state: 'error' });
+      } finally {
+        autoSavingRef.current = false;
+        // Anything typed while this save was in flight gets its own save.
+        setAutoSaveTick((n) => n + 1);
+      }
+    }, 2000);
+    return () => clearTimeout(t);
+  }, [snapshot, autoSaveAllowed, autoSaveTick]);
+  // Leaving for another page inside the app (sidebar, Back to Queue) unmounts this page before the
+  // 2-second timer fires, and no browser prompt covers in-app navigation — so save on the way out.
+  const snapshotRef = useRef(snapshot);
+  snapshotRef.current = snapshot;
+  const autoSaveAllowedRef = useRef(autoSaveAllowed);
+  autoSaveAllowedRef.current = autoSaveAllowed;
+  useEffect(
+    () => () => {
+      if (autoSaveAllowedRef.current && snapshotRef.current !== lastSavedRef.current && !autoSavingRef.current) {
+        void persistRef.current?.().catch(() => {});
+      }
+    },
+    []
+  );
+  const hasUnsavedChanges = autoSave.state === 'pending' || autoSave.state === 'saving' || autoSave.state === 'error';
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [hasUnsavedChanges]);
 
   // The prescription page returns here with review=1. Move the doctor straight into the final
   // safety review instead of making them rediscover the completion action in the workspace.
@@ -513,16 +592,30 @@ const Workspace = ({ appointmentId }: { appointmentId: number }) => {
     },
   });
 
+  // Autosave and the buttons can both save at once; only one of them may create the record.
   const persist = async (): Promise<number> => {
     const input = buildInput();
-    if (consultationId) {
-      await updateConsultation(consultationId, input);
-      return consultationId;
+    const existingId = consultationId ?? createdIdRef.current;
+    if (existingId) {
+      await updateConsultation(existingId, input);
+      return existingId;
     }
-    const created = await createConsultation(appointmentId, input);
-    setConsultationId(created.consultation_id);
-    return created.consultation_id;
+    if (creatingRef.current) {
+      const id = await creatingRef.current;
+      await updateConsultation(id, input);
+      return id;
+    }
+    creatingRef.current = createConsultation(appointmentId, input).then((c) => c.consultation_id);
+    try {
+      const id = await creatingRef.current;
+      createdIdRef.current = id;
+      setConsultationId(id);
+      return id;
+    } finally {
+      creatingRef.current = null;
+    }
   };
+  persistRef.current = persist;
 
   const handleSaveDraft = async () => {
     setSaveError(null);
@@ -711,6 +804,8 @@ const Workspace = ({ appointmentId }: { appointmentId: number }) => {
           This appointment isn't currently in consultation, so a new consultation record can't be started here.
         </div>
       )}
+
+      {patient.patientId && <AiSummaryPanel patientId={patient.patientId} />}
 
       <div className="card cons-vitals-strip">
         <div className="card-header">
@@ -1519,9 +1614,19 @@ const Workspace = ({ appointmentId }: { appointmentId: number }) => {
       {!isFinalized && canEdit && tab !== 'prescription' && (
         <div className="cons-rapid-footer">
           <div>
-            <span className={`cons-save-state${consultationId ? ' saved' : ''}`} />
+            <span className={`cons-save-state${autoSave.state === 'error' ? ' error' : consultationId && !hasUnsavedChanges ? ' saved' : ''}`} />
             <strong>Step 1 · Clinical assessment</strong>
-            <small>Saved automatically when you order tests, continue or finish.</small>
+            <small>
+              {autoSave.state === 'saving'
+                ? 'Saving…'
+                : autoSave.state === 'pending'
+                  ? 'Unsaved changes — saving shortly'
+                  : autoSave.state === 'error'
+                    ? 'Could not save — check the connection, then press Save draft'
+                    : autoSave.state === 'saved' && autoSave.at
+                      ? `All changes saved · ${autoSave.at.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`
+                      : 'Changes are saved automatically as you type'}
+            </small>
           </div>
           <button className="cons-btn" disabled={saving || finalizing} onClick={handleSaveDraft}><SaveIcon /> {saving ? 'Saving…' : 'Save draft'}</button>
           <button className="cons-btn" disabled={saving || finalizing} onClick={() => void openLabTests()}><ClipboardIcon /> Order lab tests</button>

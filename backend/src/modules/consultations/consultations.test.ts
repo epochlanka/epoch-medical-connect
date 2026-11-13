@@ -71,7 +71,7 @@ describe('Consultations API', () => {
     const res = await request(app)
       .post('/api/v1/consultations')
       .set('Authorization', `Bearer ${pharmacistRes.body.token}`)
-      .send({ appointment_id: appointment.appointment_id });
+      .send({ appointment_id: appointment.appointment_id, complaint: 'Test visit' });
 
     expect(res.status).toBe(403);
   });
@@ -114,7 +114,7 @@ describe('Consultations API', () => {
     const res = await request(app)
       .post('/api/v1/consultations')
       .set('Authorization', `Bearer ${doctorToken}`)
-      .send({ appointment_id: appointmentId });
+      .send({ appointment_id: appointmentId, complaint: 'Test visit' });
 
     expect(res.status).toBe(400);
   });
@@ -284,7 +284,7 @@ describe('Consultations API', () => {
       const createRes = await request(app)
         .post('/api/v1/consultations')
         .set('Authorization', `Bearer ${doctorToken}`)
-        .send({ appointment_id: appointment.appointment_id });
+        .send({ appointment_id: appointment.appointment_id, complaint: 'Test visit' });
       const docConsultationId = createRes.body.consultation_id;
 
       const uploadRes = await request(app)
@@ -311,7 +311,7 @@ describe('Consultations API', () => {
       const createRes = await request(app)
         .post('/api/v1/consultations')
         .set('Authorization', `Bearer ${doctorToken}`)
-        .send({ appointment_id: appointment.appointment_id });
+        .send({ appointment_id: appointment.appointment_id, complaint: 'Test visit' });
 
       const res = await request(app)
         .post(`/api/v1/consultations/${createRes.body.consultation_id}/documents`)
@@ -353,7 +353,7 @@ describe('Consultations API', () => {
       const draftRes = await request(app)
         .post('/api/v1/consultations')
         .set('Authorization', `Bearer ${doctorToken}`)
-        .send({ appointment_id: draftAppointment.appointment_id });
+        .send({ appointment_id: draftAppointment.appointment_id, complaint: 'Test visit' });
 
       const historyRes = await request(app)
         .get(`/api/v1/consultations/patient-history/${patient.patient_id}`)

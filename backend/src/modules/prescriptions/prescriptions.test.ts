@@ -30,7 +30,7 @@ const makeDraftConsultationForPatient = async (doctorToken: string, doctorId: nu
   const consultRes = await request(app)
     .post('/api/v1/consultations')
     .set('Authorization', `Bearer ${doctorToken}`)
-    .send({ appointment_id: appointment.appointment_id });
+    .send({ appointment_id: appointment.appointment_id, complaint: 'Test visit' });
   return { consultationId: consultRes.body.consultation_id };
 };
 

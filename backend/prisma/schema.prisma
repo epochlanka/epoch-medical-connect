@@ -65,6 +65,8 @@ model Patient {
   lab_test_orders            LabTestOrder[]
   external_medicines         ExternalPrescriptionMedicine[]
   issued_letters             IssuedLetter[]
+  ai_summaries               AiPatientSummary[]
+  medication_stops           MedicationStop[]
 
   @@index([full_name])
   @@index([phone])
@@ -258,6 +260,9 @@ model PrescriptionItem {
   dose_qty                Float?
   // True when the clinician deliberately entered qty instead of accepting the calculated one.
   qty_manual              Boolean   @default(false)
+  // Taken long-term (e.g. a monthly antihypertensive): stays on the patient's ongoing-medicines list
+  // after its course runs out, until a doctor stops it. See currentMedications.ts.
+  is_long_term            Boolean   @default(false)
   qty                     Int
   external_qty            Int       @default(0) // portion of qty sourced externally — 0 = fully clinic, qty = fully external, else split
   dispensed_qty           Int       @default(0) // cumulative qty drawn from clinic stock across partial dispenses; item is complete once dispensed_qty + external_qty >= qty
@@ -372,6 +377,7 @@ model ExternalPrescriptionMedicine {
   quantity        Int
   quantity_unit   String
   instructions    String? // ';'-joined chips, same encoding as PrescriptionItem.instructions
+  is_long_term    Boolean  @default(false) // same meaning as PrescriptionItem.is_long_term
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
 
@@ -856,6 +862,8 @@ model User {
   refunds_issued                Refund[]
   cash_day_closes               CashDayClose[]                 @relation("CashDayCloser")
   cash_day_reopens              CashDayReopen[]                @relation("CashDayReopener")
+  ai_summaries_created          AiPatientSummary[]             @relation("AiSummaryCreator")
+  medication_stops              MedicationStop[]               @relation("MedicationStopper")
   settings_updates              ClinicSettings[]
   backups_created               DbBackup[]
   sessions                      UserSession[]
@@ -1031,4 +1039,44 @@ model DbBackup {
   verified_at DateTime?
 
   creator User @relation(fields: [created_by], references: [user_id])
+}
+
+// AI-written pre-consultation summaries (a Pro feature, off unless AI_FEATURES_ENABLED=true). Each row is one
+// generated summary, kept so that reopening an unchanged record shows it again without another paid
+// request (input_hash is a fingerprint of exactly what was sent), and so token use can be totalled
+// per clinic. The summary is a draft for the doctor; it is never written into the clinical record.
+model AiPatientSummary {
+  summary_id    Int      @id @default(autoincrement())
+  patient_id    String
+  input_hash    String
+  model         String
+  summary_json  String
+  input_tokens  Int
+  output_tokens Int
+  created_by    Int
+  created_at    DateTime @default(now())
+
+  patient Patient @relation(fields: [patient_id], references: [patient_id])
+  creator User    @relation("AiSummaryCreator", fields: [created_by], references: [user_id])
+
+  @@index([patient_id, created_at])
+}
+
+// A doctor's decision that the patient no longer takes a medicine. It hides every course of that
+// medicine issued before stopped_at from the ongoing-medicines list; prescribing it again later
+// brings it back. medicine_key is the lower-cased name, the same key the list groups courses by.
+model MedicationStop {
+  stop_id         Int      @id @default(autoincrement())
+  patient_id      String
+  medicine_key    String
+  medicine_name   String
+  reason          String?
+  consultation_id Int?
+  stopped_by      Int
+  stopped_at      DateTime @default(now())
+
+  patient Patient @relation(fields: [patient_id], references: [patient_id])
+  stopper User    @relation("MedicationStopper", fields: [stopped_by], references: [user_id])
+
+  @@index([patient_id, medicine_key])
 }

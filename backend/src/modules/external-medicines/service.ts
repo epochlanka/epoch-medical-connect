@@ -28,6 +28,7 @@ export interface ExternalMedicineInput {
   quantity: number;
   quantity_unit: string;
   instructions?: string;
+  is_long_term?: boolean;
 }
 
 const serialize = (row: any) => ({
@@ -48,6 +49,7 @@ const serialize = (row: any) => ({
   quantity: row.quantity,
   quantityUnit: row.quantity_unit,
   instructions: row.instructions,
+  isLongTerm: row.is_long_term,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -127,6 +129,7 @@ export const createExternalMedicine = async (prescriptionId: number, input: Exte
       quantity: input.quantity,
       quantity_unit: input.quantity_unit.trim(),
       instructions: input.instructions || undefined,
+      is_long_term: !!input.is_long_term,
     },
   });
   return serialize(row);
@@ -162,6 +165,7 @@ export const bulkCreateExternalMedicines = async (prescriptionId: number, items:
           quantity: input.quantity,
           quantity_unit: input.quantity_unit.trim(),
           instructions: input.instructions || undefined,
+          is_long_term: !!input.is_long_term,
         },
       });
       created.push(row);
@@ -230,6 +234,7 @@ export const updateExternalMedicine = async (extItemId: number, updates: Partial
     quantity: updates.quantity ?? existing.quantity,
     quantity_unit: updates.quantity_unit ?? existing.quantity_unit,
     instructions: updates.instructions ?? existing.instructions ?? undefined,
+    is_long_term: updates.is_long_term ?? existing.is_long_term,
   };
   assertLineValid(merged);
 
@@ -248,6 +253,7 @@ export const updateExternalMedicine = async (extItemId: number, updates: Partial
       quantity: merged.quantity,
       quantity_unit: merged.quantity_unit.trim(),
       instructions: merged.instructions,
+      is_long_term: !!merged.is_long_term,
     },
   });
   return serialize(row);

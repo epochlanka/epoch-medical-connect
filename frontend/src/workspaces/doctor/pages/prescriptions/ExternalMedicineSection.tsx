@@ -153,6 +153,8 @@ export interface ExternalMedicineDraft {
   qtyManual: boolean;
   quantity_unit: string;
   instructionChips: string[];
+  /** Taken long-term: stays on the ongoing-medicines list after the course runs out. */
+  isLongTerm?: boolean;
 }
 
 // Passed down when the doctor clicks "Add to External Medicines" on a clinic item that's
@@ -213,6 +215,7 @@ export const draftToInput = (d: ExternalMedicineDraft): ExternalMedicineInput =>
   quantity: Number(d.quantity) || 1,
   quantity_unit: d.quantity_unit,
   instructions: d.instructionChips.length ? d.instructionChips.join('; ') : undefined,
+  is_long_term: !!d.isLongTerm,
 });
 
 const emptyDraft = (key: string): ExternalMedicineDraft => ({
@@ -639,6 +642,11 @@ const AddExternalMedicineModal = ({
               <InstructionsPicker chips={draft.instructionChips} onChange={(chips) => setDraft({ ...draft, instructionChips: chips })} />
             </div>
 
+            <label className="rxp-longterm">
+              <input type="checkbox" checked={!!draft.isLongTerm} onChange={(e) => setDraft({ ...draft, isLongTerm: e.target.checked })} />
+              Long-term medicine <small>— keep it on the patient's ongoing list until a doctor stops it</small>
+            </label>
+
             <datalist id="ext-frequency-options">
               {FREQUENCY_OPTIONS.map((o) => (
                 <option key={o} value={o} />
@@ -773,6 +781,7 @@ const ExternalMedicineSection = ({
                     {it.medicine_name}
                     {it.strength && <span className="ext-item-strength">{it.strength}</span>}
                     <span className="ext-tag">Buy outside</span>
+                    {it.isLongTerm && <span className="rxp-longterm-tag">Long-term</span>}
                   </div>
                   <div className="ext-item-meta">
                     {[it.dosage_form, it.generic_name, it.brand_name].filter(Boolean).join(' · ')}

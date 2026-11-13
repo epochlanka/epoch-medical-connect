@@ -50,7 +50,7 @@ const makeVisit = async (opts: { medicineId: number; qty: number; finalize?: boo
   const appointment = await prisma.appointment.create({
     data: { patient_id: patient.patient_id, doctor_id: doctorId, scheduled_at: new Date(), status: 'Consulting', created_by: receptionist.user_id },
   });
-  const consultRes = await request(app).post('/api/v1/consultations').set('Authorization', `Bearer ${doctorToken}`).send({ appointment_id: appointment.appointment_id });
+  const consultRes = await request(app).post('/api/v1/consultations').set('Authorization', `Bearer ${doctorToken}`).send({ appointment_id: appointment.appointment_id, complaint: 'Test visit' });
   const consultationId: number = consultRes.body.consultation_id;
 
   const rxRes = await request(app)

@@ -29,7 +29,7 @@ const makePrescription = async (
   const consultRes = await request(app)
     .post('/api/v1/consultations')
     .set('Authorization', `Bearer ${doctorToken}`)
-    .send({ appointment_id: appointment.appointment_id });
+    .send({ appointment_id: appointment.appointment_id, complaint: 'Test visit' });
   const rxRes = await request(app)
     .post('/api/v1/prescriptions')
     .set('Authorization', `Bearer ${doctorToken}`)
@@ -440,7 +440,7 @@ describe('Pharmacy API', () => {
       const consultRes = await request(app)
         .post('/api/v1/consultations')
         .set('Authorization', `Bearer ${doctorToken}`)
-        .send({ appointment_id: appointment.appointment_id });
+        .send({ appointment_id: appointment.appointment_id, complaint: 'Test visit' });
       const rxRes = await request(app)
         .post('/api/v1/prescriptions')
         .set('Authorization', `Bearer ${doctorToken}`)

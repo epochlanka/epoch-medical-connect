@@ -29,6 +29,7 @@ import icd11Router from './modules/icd11/router';
 import labTestOrdersRouter from './modules/labTestOrders/router';
 import externalMedicinesRouter from './modules/external-medicines/router';
 import lettersRouter from './modules/letters/router';
+import aiRouter from './modules/ai/router';
 
 // Load environment variables
 dotenv.config();
@@ -153,6 +154,7 @@ app.use('/api/v1/icd11', icd11Router);
 app.use('/api/v1/lab-test-orders', labTestOrdersRouter);
 app.use('/api/v1/external-medicines', externalMedicinesRouter);
 app.use('/api/v1/letters', lettersRouter);
+app.use('/api/v1/ai', aiRouter);
 
 // Deliberate-error endpoints for testing the error pipeline. OFF unless explicitly enabled and
 // never in production (see backend/src/errors/diagnostics.ts).

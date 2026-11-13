@@ -7,7 +7,9 @@ import { draftKey as scopedDraftKey } from '../../lib/drafts';
 import { searchMedicines } from '../../lib/medicines';
 import type { Medicine } from '../../lib/medicines';
 import { getPrescriptionContext, createPrescription, displayPrescriptionPatient } from '../../lib/prescriptions';
-import type { PrescriptionItemInput } from '../../lib/prescriptions';
+import type { PrescriptionItemInput, OngoingMedication } from '../../lib/prescriptions';
+import OngoingMedicationsPanel from './OngoingMedicationsPanel';
+import type { ContinueMode } from './OngoingMedicationsPanel';
 import { bulkCreateExternalMedicines } from '../../lib/externalMedicines';
 import { finalizeConsultation } from '../../lib/consultations';
 import { getClinicSettings } from '../../lib/settings';
@@ -205,6 +207,8 @@ interface DraftItem {
   route: string;
   instructionChips: string[];
   qty: string;
+  /** Taken long-term: stays on the ongoing-medicines list after the course runs out. */
+  isLongTerm?: boolean;
 }
 
 // Fills in defaults for drafts saved before external purchase/instructions-chips support existed,
@@ -482,6 +486,101 @@ const Builder = ({ consultationId }: { consultationId: number }) => {
     })();
   }, [location.state]);
 
+  // "Ongoing medicines" panel: Continue / Change copy a medicine the patient is already on into
+  // today's prescription for the chosen length (1–3 months or until a date), with the quantity
+  // recalculated. Clinic medicines are looked up again so today's stock and active status apply.
+  const [ongoingBusy, setOngoingBusy] = useState(false);
+  const [highlightKey, setHighlightKey] = useState<string | null>(null);
+  const [stoppedOngoing, setStoppedOngoing] = useState<string[]>([]);
+  useEffect(() => {
+    if (!highlightKey) return;
+    document.getElementById(`rx-item-${highlightKey}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const t = setTimeout(() => setHighlightKey(null), 4000);
+    return () => clearTimeout(t);
+  }, [highlightKey]);
+
+  const continueOngoing = async (meds: OngoingMedication[], duration: string, mode: ContinueMode) => {
+    setOngoingBusy(true);
+    try {
+      const stamp = Date.now();
+      const added: DraftItem[] = [];
+      const addedExternal: ExternalMedicineDraft[] = [];
+      const missing: string[] = [];
+      const chips = (text: string | null) => (text ? text.split(';').map((c) => c.trim()).filter(Boolean) : []);
+      for (const med of meds) {
+        const dose = med.doseQty ? String(med.doseQty) : '';
+        const frequency = med.frequency ?? '';
+        const expected = computeExpectedQty(frequency, duration, dose);
+        // A schedule that can't be totalled (PRN, free text) keeps the last quantity, entered by
+        // hand; otherwise the quantity is recalculated, and a missing dose is left for the doctor.
+        const qtyManual = scheduledDoseCount(frequency, duration) === null;
+        if (med.outside) {
+          addedExternal.push({
+            key: `ext-ongoing-${stamp}-${addedExternal.length}`,
+            medicine_id: med.medicineId ?? undefined,
+            medicine_name: med.name,
+            generic_name: med.genericName ?? '',
+            brand_name: med.brandName ?? '',
+            dosage_form: med.dosageForm ?? '',
+            strength: med.strength ?? '',
+            dosage: med.dosage,
+            dose_qty: dose,
+            frequency,
+            duration,
+            quantity: String(expected ?? med.qty),
+            qtyManual: expected === null,
+            quantity_unit: med.quantityUnit ?? '',
+            instructionChips: chips(med.instructions),
+            isLongTerm: med.longTerm,
+          });
+          continue;
+        }
+        const results = await searchMedicines(med.name).catch(() => [] as Medicine[]);
+        const m = results.find((r) => r.medicine_id === med.medicineId) ?? results.find((r) => r.name.toLowerCase() === med.key);
+        if (!m || !m.is_active) {
+          missing.push(med.name);
+          continue;
+        }
+        added.push({
+          key: `${m.medicine_id}-${stamp}-${added.length}`,
+          medicine_id: m.medicine_id,
+          name: m.name,
+          generic_name: m.generic_name,
+          strength: m.strength,
+          form: m.form,
+          category: m.category,
+          unit: m.base_unit,
+          totalQty: m.totalQty,
+          stockStatus: m.stockStatus,
+          dosage: med.dosage,
+          dose_qty: dose,
+          qtyManual,
+          frequency,
+          duration,
+          route: med.route ?? '',
+          instructionChips: chips(med.instructions),
+          qty: String(expected ?? med.qty),
+          isLongTerm: med.longTerm,
+        });
+      }
+      const newItems = added.filter((a) => !items.some((p) => p.medicine_id === a.medicine_id));
+      const newExternal = addedExternal.filter((e) => !externalItems.some((p) => p.medicine_name.trim().toLowerCase() === e.medicine_name.trim().toLowerCase()));
+      setItems((prev) => [...prev, ...newItems]);
+      setExternalItems((prev) => [...prev, ...newExternal]);
+      const count = newItems.length + newExternal.length;
+      setRepeatNotice(
+        (count
+          ? mode === 'change'
+            ? `Added ${meds[0].name} for ${duration.toLowerCase()} — make your changes below.`
+            : `Continued ${count} medicine${count === 1 ? '' : 's'} for ${duration.toLowerCase()}. Check the doses before finalizing.`
+          : '') + (missing.length ? ` Not added (no longer in the clinic list): ${missing.join(', ')}.` : '')
+      );
+      if (newItems.length) setHighlightKey(newItems[0].key);
+    } finally {
+      setOngoingBusy(false);
+    }
+  };
+
   const addMedicine = (m: Medicine) => {
     if (items.some((i) => i.medicine_id === m.medicine_id)) {
       setSearchOpen(false);
@@ -589,6 +688,7 @@ const Builder = ({ consultationId }: { consultationId: number }) => {
       dose_qty: Number(i.dose_qty) > 0 ? Number(i.dose_qty) : undefined,
       qty_manual: i.qtyManual || scheduledDoseCount(i.frequency, i.duration) === null,
       external_qty: 0,
+      is_long_term: !!i.isLongTerm,
     }));
 
   // Live allergy check — same substring match the backend runs authoritatively at submit time;
@@ -624,6 +724,12 @@ const Builder = ({ consultationId }: { consultationId: number }) => {
   };
 
   const openFinalReview = (withoutPrescription = false) => {
+    // Checked here, before anything is sent: the prescription goes to the pharmacy first and the
+    // visit is finalized second, so a visit the server would refuse must not get that far.
+    if (!context?.consultation.complaint?.trim()) {
+      setSubmitError('Record the reason for the visit on the examination page (“← Back to examination”) before finalizing.');
+      return;
+    }
     if (!withoutPrescription && !validatePrescriptionDraft()) return;
     // "No medicines needed" skips the prescription entirely, which would quietly lose anything
     // listed to buy outside — those used to vanish from the record without a word.
@@ -819,6 +925,17 @@ const Builder = ({ consultationId }: { consultationId: number }) => {
 
       <div className="cons-layout rxp-no-rail">
         <div>
+          {patient.patientId && (
+            <OngoingMedicationsPanel
+              medicines={context.ongoingMedications ?? []}
+              patientId={patient.patientId}
+              consultationId={consultationId}
+              addedKeys={new Set([...items.map((i) => i.name.trim().toLowerCase()), ...externalItems.map((e) => e.medicine_name.trim().toLowerCase())])}
+              busy={ongoingBusy}
+              onAdd={(meds, duration, mode) => void continueOngoing(meds, duration, mode)}
+              onStoppedChange={setStoppedOngoing}
+            />
+          )}
           <div className="cons-box" style={{ marginBottom: 16 }}>
             <div className="cons-box-title">
               <span>Medicines{items.length > 0 ? ` (${items.length})` : ''}</span>
@@ -877,12 +994,26 @@ const Builder = ({ consultationId }: { consultationId: number }) => {
                   const qtyNote = explainQty(it.frequency, it.duration, it.dose_qty, it.unit, it.qty);
                   const badge = stockBadge(it);
                   return (
-                    <li className="rxp-item" key={it.key}>
+                    <li className={`rxp-item${highlightKey === it.key ? ' rxp-item-highlight' : ''}`} key={it.key} id={`rx-item-${it.key}`}>
                       <div className="rxp-item-head">
                         <span className="rxp-item-num">{i + 1}</span>
                         <div className="rxp-item-title">
                           <div className="rxb-med-name">{it.name}</div>
                           <div className="rxb-med-generic">{[it.form, it.category].filter(Boolean).join(' · ') || it.generic_name}</div>
+                          {(() => {
+                            // Same generic as something the patient is already on, under another name.
+                            const generic = it.generic_name?.trim().toLowerCase();
+                            const twin = generic
+                              ? (context.ongoingMedications ?? []).find(
+                                  (o) => o.status !== 'ended' && o.key !== it.name.trim().toLowerCase() && o.genericName?.trim().toLowerCase() === generic && !stoppedOngoing.includes(o.key)
+                                )
+                              : undefined;
+                            return twin ? (
+                              <div className="rxp-dup-warn">
+                                <AlertIcon /> Same medicine ({it.generic_name}) as {twin.name}, which the patient is already on. Stop {twin.name} above if this replaces it.
+                              </div>
+                            ) : null;
+                          })()}
                         </div>
                         <div className="rxp-source-block">
                           <div className="rxp-source-meta">
@@ -1009,6 +1140,14 @@ const Builder = ({ consultationId }: { consultationId: number }) => {
                           onChange={(chips) => setItems((prev) => prev.map((x) => (x.key === it.key ? { ...x, instructionChips: chips } : x)))}
                         />
                       </div>
+                      <label className="rxp-longterm">
+                        <input
+                          type="checkbox"
+                          checked={!!it.isLongTerm}
+                          onChange={(e) => setItems((prev) => prev.map((x) => (x.key === it.key ? { ...x, isLongTerm: e.target.checked } : x)))}
+                        />
+                        Long-term medicine <small>— keep it on the patient's ongoing list until a doctor stops it</small>
+                      </label>
                     </li>
                   );
                 })}

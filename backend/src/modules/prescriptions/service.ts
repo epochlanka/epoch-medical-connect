@@ -1,9 +1,10 @@
+import { mergeChronicConditions } from '../consultations/conditions';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { LOW_STOCK_THRESHOLD } from '../../lib/stock';
 import { NotFoundError, ValidationError, ForbiddenError, AllergyConflictError } from './errors';
 import { computeExpectedQty, scheduledDoseCount } from './qtyCalc';
-import { getCurrentMedications, currentMedicationLabels } from './currentMedications';
+import { getOngoingMedications, currentMedicationLabels } from './currentMedications';
 import { parseAdditionalDiagnoses } from '../consultations/service';
 
 
@@ -32,6 +33,7 @@ interface PrescriptionItemInput {
   dose_qty?: number;
   qty_manual?: boolean;
   external_qty?: number;
+  is_long_term?: boolean;
 }
 
 interface CreatePrescriptionInput {
@@ -88,6 +90,7 @@ export const createPrescription = async (input: CreatePrescriptionInput, actor: 
         // recorded dose_qty there is nothing to recompute it from, so carry it as manual rather
         // than rejecting a historical line whose frequency this parser now understands.
         qty_manual: i.qty_manual || i.dose_qty == null,
+        is_long_term: i.is_long_term,
       }));
     }
   }
@@ -194,6 +197,7 @@ export const createPrescription = async (input: CreatePrescriptionInput, actor: 
             dose_qty: i.dose_qty,
             qty_manual: !!i.qty_manual,
             external_qty: i.external_qty ?? 0,
+            is_long_term: !!i.is_long_term,
           })),
         },
       },
@@ -405,18 +409,18 @@ export const getPrescriptionContext = async (consultationId: number) => {
           take: 10,
           include: { items: { include: { medicine: { select: { name: true } } } } },
         }),
-        getCurrentMedications(patientId, { excludeConsultationId: consultationId }),
+        getOngoingMedications(patientId, { excludeConsultationId: consultationId }),
       ])
     : [[], [], null];
 
-  const chronicConditions = Array.from(
-    new Set(pastConsultations.flatMap((c) => (c.medical_history_json ? (JSON.parse(c.medical_history_json) as string[]) : [])))
-  );
+  const chronicConditions = mergeChronicConditions(consultation.appointment.patient?.chronic_conditions, pastConsultations.map((c) => c.medical_history_json));
 
   return {
     consultation: {
       consultationId: consultation.consultation_id,
       status: consultation.status,
+      // Finalizing needs it; the page checks before sending the prescription to the pharmacy.
+      complaint: consultation.complaint,
       diagnosis: consultation.diagnosis,
       icd10Code: consultation.icd10_code,
       additionalDiagnoses: parseAdditionalDiagnoses(consultation.additional_diagnoses_json),
@@ -447,9 +451,11 @@ export const getPrescriptionContext = async (consultationId: number) => {
       // The patient's most recent OTHER prescription's medicines — same "currently on" signal
       // consultations/service.ts's getConsultationContext derives, just sourced from the
       // pastPrescriptions query this function already runs rather than a second lookup.
-      currentMedications: currentMedicationLabels(medications?.current ?? []),
+      currentMedications: currentMedicationLabels((medications?.medicines ?? []).filter((m) => m.status !== 'ended')),
       lastPrescribedAt: medications?.lastPrescribedAt ?? null,
     },
+    // Full detail for the "Ongoing medicines" panel: continue, change or stop each one.
+    ongoingMedications: medications?.medicines ?? [],
     pastPrescriptions: pastPrescriptions.map((rx) => ({
       prescriptionId: rx.prescription_id,
       code: `RX${String(rx.prescription_id).padStart(6, '0')}`,

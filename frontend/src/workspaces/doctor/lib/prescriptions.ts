@@ -13,6 +13,8 @@ export interface PrescriptionItemInput {
   dose_qty?: number;
   qty_manual?: boolean;
   external_qty?: number;
+  /** Taken long-term: stays on the ongoing-medicines list after the course runs out. */
+  is_long_term?: boolean;
 }
 
 /** 'External' = every medicine is bought outside; it never enters the pharmacy queue. */
@@ -168,10 +170,47 @@ export interface PastPrescription {
   items: PastPrescriptionItem[];
 }
 
+/** running = supply left; due = long-term and run out; ended = an ordinary course that ended recently. */
+export type OngoingStatus = 'running' | 'due' | 'ended';
+
+export interface OngoingMedication {
+  key: string;
+  name: string;
+  medicineId: number | null;
+  outside: boolean;
+  status: OngoingStatus;
+  longTerm: boolean;
+  markedLongTerm: boolean;
+  issuedAt: string;
+  endsAt: string | null;
+  daysLeft: number | null;
+  prescriptionId: number;
+  consultationId: number;
+  lastDispensedAt: string | null;
+  dosage: string;
+  doseQty: number | null;
+  frequency: string | null;
+  duration: string | null;
+  route: string | null;
+  instructions: string | null;
+  qty: number;
+  genericName: string | null;
+  brandName: string | null;
+  dosageForm: string | null;
+  strength: string | null;
+  quantityUnit: string | null;
+}
+
+export const stopMedication = (input: { patient_id: string; medicine_name: string; reason?: string; consultation_id?: number }) =>
+  api.post<{ stopId: number; medicineName: string; stoppedAt: string }>('/prescriptions/medication-stops', input).then((r) => r.data);
+
+export const undoStopMedication = (stopId: number) => api.delete(`/prescriptions/medication-stops/${stopId}`);
+
 export interface PrescriptionContext {
   consultation: {
     consultationId: number;
     status: string;
+    complaint: string | null;
     diagnosis: string | null;
     icd10Code: string | null;
     additionalDiagnoses: { code: string | null; title: string }[];
@@ -188,6 +227,7 @@ export interface PrescriptionContext {
   existingPrescriptions: { prescription_id: number; status: string; issued_at: string }[];
   patientSummary: { allergies: string | null; chronicConditions: string[]; currentMedications: string[]; lastPrescribedAt: string | null; priorVisitCount: number };
   pastPrescriptions: PastPrescription[];
+  ongoingMedications: OngoingMedication[];
 }
 
 export const getPrescriptionContext = (consultationId: number) =>

@@ -25,6 +25,7 @@ const itemSchema = z.object({
   quantity: z.number().positive('Quantity must be a positive number'),
   quantity_unit: z.string().min(1, 'Quantity unit is required'),
   instructions: z.string().optional(),
+  is_long_term: z.boolean().optional(),
 });
 
 const prescriptionIdParams = z.object({ params: z.object({ prescriptionId: z.coerce.number().int().positive() }) });

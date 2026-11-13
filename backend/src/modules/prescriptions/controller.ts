@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import * as service from './service';
+import { stopMedication as stopMedicationService, undoStopMedication as undoStopService } from './stops';
 import { streamPrescriptionPdf, streamExternalPurchaseSlipPdf } from './pdf';
 import { clinicName } from '../../lib/clinic';
 import { NotFoundError, ValidationError, ForbiddenError, AllergyConflictError } from './errors';
@@ -143,6 +144,23 @@ export const list = async (req: Request, res: Response) => {
       limit: limit ? Number(limit) : undefined,
     });
     res.status(200).json(result);
+  } catch (error) {
+    handleError(req, res, error);
+  }
+};
+
+export const stopMedication = async (req: Request, res: Response) => {
+  try {
+    res.status(201).json(await stopMedicationService(req.body, actor(req)));
+  } catch (error) {
+    handleError(req, res, error);
+  }
+};
+
+export const undoStopMedication = async (req: Request, res: Response) => {
+  try {
+    await undoStopService(Number(req.params.stopId), actor(req));
+    res.status(204).end();
   } catch (error) {
     handleError(req, res, error);
   }

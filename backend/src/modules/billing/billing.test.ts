@@ -35,7 +35,7 @@ const makeFinalizedConsultationWithDispensedRx = async (doctorToken: string, doc
   const appointment = await prisma.appointment.create({
     data: { patient_id: patient.patient_id, doctor_id: doctorId, scheduled_at: new Date(), status: 'Consulting', created_by: receptionist.user_id },
   });
-  const consultRes = await request(app).post('/api/v1/consultations').set('Authorization', `Bearer ${doctorToken}`).send({ appointment_id: appointment.appointment_id });
+  const consultRes = await request(app).post('/api/v1/consultations').set('Authorization', `Bearer ${doctorToken}`).send({ appointment_id: appointment.appointment_id, complaint: 'Test visit' });
   const consultationId = consultRes.body.consultation_id;
 
   const rxRes = await request(app)
@@ -105,7 +105,7 @@ describe('Billing API', () => {
     const consultRes = await request(app)
       .post('/api/v1/consultations')
       .set('Authorization', `Bearer ${doctorToken}`)
-      .send({ appointment_id: appointment.appointment_id });
+      .send({ appointment_id: appointment.appointment_id, complaint: 'Test visit' });
 
     const res = await request(app)
       .post('/api/v1/invoices')
@@ -170,7 +170,7 @@ describe('Billing API', () => {
     const consultRes = await request(app)
       .post('/api/v1/consultations')
       .set('Authorization', `Bearer ${doctorToken}`)
-      .send({ appointment_id: appointment.appointment_id });
+      .send({ appointment_id: appointment.appointment_id, complaint: 'Test visit' });
     const consultationId = consultRes.body.consultation_id;
 
     // No prescription at all — doctor just finalizes (Continue Without Registration -> consultation
@@ -528,7 +528,7 @@ describe('Billing API', () => {
       const appointment = await prisma.appointment.create({
         data: { patient_id: patient.patient_id, doctor_id: doctorId, scheduled_at: new Date(), status: 'Consulting', created_by: receptionist.user_id },
       });
-      const consultRes = await request(app).post('/api/v1/consultations').set('Authorization', `Bearer ${doctorToken}`).send({ appointment_id: appointment.appointment_id });
+      const consultRes = await request(app).post('/api/v1/consultations').set('Authorization', `Bearer ${doctorToken}`).send({ appointment_id: appointment.appointment_id, complaint: 'Test visit' });
       const consultationId = consultRes.body.consultation_id;
 
       const rxRes = await request(app)
@@ -579,7 +579,7 @@ describe('Billing API', () => {
         const appointment = await prisma.appointment.create({
           data: { patient_id: patient.patient_id, doctor_id: doctorId, scheduled_at: new Date(), status: 'Consulting', created_by: receptionist.user_id },
         });
-        const consultRes = await request(app).post('/api/v1/consultations').set('Authorization', `Bearer ${doctorToken}`).send({ appointment_id: appointment.appointment_id });
+        const consultRes = await request(app).post('/api/v1/consultations').set('Authorization', `Bearer ${doctorToken}`).send({ appointment_id: appointment.appointment_id, complaint: 'Test visit' });
         const consultationId = consultRes.body.consultation_id;
         const finalizeRes = await request(app)
           .post(`/api/v1/consultations/${consultationId}/finalize`)
@@ -649,7 +649,7 @@ describe('Billing API', () => {
       const appointment = await prisma.appointment.create({
         data: { patient_id: patient.patient_id, doctor_id: doctorId, scheduled_at: new Date(), status: 'Consulting', created_by: receptionist.user_id },
       });
-      const consultRes = await request(app).post('/api/v1/consultations').set('Authorization', `Bearer ${doctorToken}`).send({ appointment_id: appointment.appointment_id });
+      const consultRes = await request(app).post('/api/v1/consultations').set('Authorization', `Bearer ${doctorToken}`).send({ appointment_id: appointment.appointment_id, complaint: 'Test visit' });
       const consultationId = consultRes.body.consultation_id;
       const rxRes = await request(app)
         .post('/api/v1/prescriptions')
@@ -705,7 +705,7 @@ describe('Billing API', () => {
       const appointment = await prisma.appointment.create({
         data: { patient_id: patient.patient_id, doctor_id: doctorId, scheduled_at: new Date(), status: 'Consulting', created_by: receptionist.user_id },
       });
-      const consultRes = await request(app).post('/api/v1/consultations').set('Authorization', `Bearer ${doctorToken}`).send({ appointment_id: appointment.appointment_id });
+      const consultRes = await request(app).post('/api/v1/consultations').set('Authorization', `Bearer ${doctorToken}`).send({ appointment_id: appointment.appointment_id, complaint: 'Test visit' });
       const consultationId = consultRes.body.consultation_id;
       // Fully external — the patient buys the whole quantity outside the clinic, so the clinic
       // must never charge for it even though the line still reaches "dispensed" (Section 17/32).

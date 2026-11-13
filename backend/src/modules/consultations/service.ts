@@ -1,3 +1,4 @@
+import { mergeChronicConditions } from './conditions';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { getCurrentMedications, currentMedicationLabels } from '../prescriptions/currentMedications';
@@ -191,6 +192,11 @@ export const finalizeConsultation = async (id: number, actor: Actor, consultatio
   assertDoctorOwnsOrAdmin(actor, existing.appointment.doctor_id);
   if (existing.status !== 'Draft') throw new ValidationError('Only a Draft consultation can be finalized');
   if (consultationFee !== undefined && consultationFee < 0) throw new ValidationError('Consultation fee cannot be negative');
+  // Every finished visit records why the patient came. The examination page's final check already
+  // insisted on it, but finalizing from the prescription page skipped that check — so it lives here.
+  if (!existing.complaint?.trim()) {
+    throw new ValidationError('Record the reason for the visit (chief complaint) before finalizing');
+  }
 
   const clinicSettings = await prisma.clinicSettings.findUnique({ where: { id: 1 } });
   const resolvedFee = consultationFee ?? clinicSettings?.default_consultation_fee ?? FALLBACK_CONSULTATION_FEE;
@@ -434,9 +440,7 @@ export const getConsultationContext = async (appointmentId: number, actor: Actor
       ])
     : [[], null, null];
 
-  const chronicConditions = Array.from(
-    new Set(pastConsultations.flatMap((c) => (c.medical_history_json ? (JSON.parse(c.medical_history_json) as string[]) : [])))
-  );
+  const chronicConditions = mergeChronicConditions(appointment.patient?.chronic_conditions, pastConsultations.map((c) => c.medical_history_json));
 
   const recentConsultations = pastConsultations.slice(0, 5).map((c) => ({ diagnosis: c.diagnosis, date: c.created_at }));
 
