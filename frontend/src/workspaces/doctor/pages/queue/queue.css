@@ -52,27 +52,19 @@
   color: #dc2626;
 }
 
-/* Current Queue table (Live Queue page): fits entirely within its card, no horizontal scroll —
-   fixed column proportions so the Action button is always visible without sliding. Scoped to
-   this table only so the shared .pat-table styling elsewhere in the app is untouched. */
-.q-live-queue-table {
-  table-layout: fixed;
-  width: 100%;
-}
+/* Current Queue table (Live Queue page): columns size to their content inside the card; long
+   patient names wrap rather than pushing the Action button out of view. */
 .q-live-queue-table th,
 .q-live-queue-table td {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  padding: 10px 12px;
 }
-.q-live-queue-table td:nth-child(3) {
+.q-live-queue-table th {
+  white-space: nowrap;
+}
+.q-live-queue-table td:nth-child(2) {
   white-space: normal;
   word-break: break-word;
-}
-/* Action column (8th): never clip the button — let width alone (28% via colgroup) keep it visible. */
-.q-live-queue-table th:nth-child(8),
-.q-live-queue-table td:nth-child(8) {
-  overflow: visible;
-  text-overflow: clip;
+  min-width: 140px;
 }
 
 .q-now-card {
@@ -333,8 +325,24 @@ tr.q-row-next {
   letter-spacing: 0.02em;
 }
 
-@media (max-width: 1180px) {
+/* Below this the queue table and the side cards cannot sit side by side without the Action
+   column scrolling out of view, so the cards drop below the table. */
+@media (max-width: 1340px) {
   .q-layout {
     grid-template-columns: 1fr !important;
   }
+}
+
+.q-tab-count {
+  display: inline-block;
+  margin-left: 6px;
+  min-width: 18px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background: #fee2e2;
+  color: #b91c1c;
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
 }

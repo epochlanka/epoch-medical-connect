@@ -151,7 +151,7 @@ const formFromContext = (context: Awaited<ReturnType<typeof getConsultationConte
 const numOrUndefined = (s: string) => (s.trim() === '' ? undefined : Number(s));
 
 // Landing view when no appointment is specified — routes the doctor straight to whichever
-// appointment of theirs is currently Consulting, or offers a pick list / a way back to Call Next.
+// appointment of theirs is currently Consulting, or offers a pick list / a way back to the queue.
 const WorkspacePicker = () => {
   const navigate = useNavigate();
   const { data: queue, loading } = useApiData(getLiveQueue);
@@ -168,9 +168,9 @@ const WorkspacePicker = () => {
       <div className="card" style={{ textAlign: 'center', padding: '48px 16px' }}>
         <ClipboardIcon />
         <h3 style={{ margin: '12px 0 4px', color: '#334155' }}>No patient is currently in consultation</h3>
-        <p style={{ fontSize: 14, color: '#64748b', margin: '0 0 16px' }}>Start a consultation from Call Next to open the workspace.</p>
-        <button className="pat-btn primary" onClick={() => navigate('/queue/call-next')}>
-          Go to Call Next
+        <p style={{ fontSize: 14, color: '#64748b', margin: '0 0 16px' }}>Start a consultation from the queue to open the workspace.</p>
+        <button className="pat-btn primary" onClick={() => navigate('/queue/live')}>
+          Go to the queue
         </button>
       </div>
     );
@@ -725,7 +725,7 @@ const Workspace = ({ appointmentId }: { appointmentId: number }) => {
           <p>Record the clinical assessment, then continue to the prescription page.</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button className="pat-btn" onClick={() => navigate('/queue/call-next')}>
+          <button className="pat-btn" onClick={() => navigate('/queue/live')}>
             <ChevronLeftIcon /> Back to Queue
           </button>
           <button

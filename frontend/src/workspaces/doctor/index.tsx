@@ -4,7 +4,6 @@ import { WORKSPACES, workspaceHome } from '../../app/workspaces';
 
 import Dashboard from './pages/dashboard/Dashboard';
 import LiveQueue from './pages/queue/LiveQueue';
-import CallNext from './pages/queue/CallNext';
 import ConsultationWorkspace from './pages/consultations/ConsultationWorkspace';
 import MyConsultations from './pages/consultations/MyConsultations';
 import FollowUpsDue from './pages/consultations/FollowUpsDue';
@@ -32,7 +31,7 @@ const DoctorWorkspace = () => (
       <Route index element={<Navigate to={home} replace />} />
       <Route path="dashboard" element={<Dashboard />} />
       <Route path="queue/live" element={<LiveQueue />} />
-      <Route path="queue/call-next" element={<CallNext />} />
+      <Route path="queue/call-next" element={<Navigate to="../live" relative="path" replace />} />
       <Route path="consultations/workspace" element={<ConsultationWorkspace />} />
       <Route path="consultations/workspace/:appointmentId" element={<ConsultationWorkspace />} />
       <Route path="consultations/my" element={<MyConsultations />} />

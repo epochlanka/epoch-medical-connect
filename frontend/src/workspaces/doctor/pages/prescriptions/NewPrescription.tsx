@@ -271,8 +271,8 @@ const PrescriptionPicker = () => {
         <ClipboardIcon />
         <h3 style={{ margin: '12px 0 4px', color: '#334155' }}>No in-progress consultation to prescribe for</h3>
         <p style={{ fontSize: 14, color: '#64748b', margin: '0 0 16px' }}>Start or resume a consultation first, then prescribe from there.</p>
-        <button className="pat-btn primary" onClick={() => navigate('/queue/call-next')}>
-          Go to Call Next
+        <button className="pat-btn primary" onClick={() => navigate('/queue/live')}>
+          Go to the queue
         </button>
       </div>
     );
