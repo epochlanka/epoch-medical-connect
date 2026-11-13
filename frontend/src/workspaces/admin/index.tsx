@@ -1,6 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import AppLayout from '../../components/layout/AppLayout';
-import { navSections } from '../../components/layout/navConfig';
 import { WORKSPACES, workspaceHome } from '../../app/workspaces';
 
 import Dashboard from '../../pages/dashboard/Dashboard';
@@ -29,7 +28,6 @@ import BookAppointment from '../../pages/BookAppointment';
 import LetterTemplates from '../../pages/letters/LetterTemplates';
 import LetterTemplateEditor from '../../pages/letters/LetterTemplateEditor';
 import PatientProfile from '../../shared/patients/PatientProfile';
-import ComingSoon from '../../pages/ComingSoon';
 
 /**
  * The administration workspace, mounted by the shell at /admin.
@@ -40,13 +38,6 @@ import ComingSoon from '../../pages/ComingSoon';
  */
 
 const home = workspaceHome(WORKSPACES.admin);
-
-// Nav entries that are listed but not built yet still need a route, or they 404 instead of
-// explaining themselves.
-const unimplementedPaths = navSections
-  .flatMap((section) => section.items)
-  .filter((item) => !item.implemented)
-  .map((item) => item.path.replace(/^\//, ''));
 
 const AdminWorkspace = () => (
   <Routes>
@@ -79,9 +70,6 @@ const AdminWorkspace = () => (
       <Route path="letter-templates" element={<LetterTemplates />} />
       <Route path="letter-templates/new" element={<LetterTemplateEditor />} />
       <Route path="letter-templates/:templateId" element={<LetterTemplateEditor />} />
-      {unimplementedPaths.map((path) => (
-        <Route key={path} path={path} element={<ComingSoon />} />
-      ))}
       <Route path="*" element={<Navigate to={home} replace />} />
     </Route>
   </Routes>

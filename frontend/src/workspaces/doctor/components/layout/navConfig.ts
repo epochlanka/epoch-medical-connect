@@ -56,7 +56,7 @@ export const navSections: NavSection[] = [
 export const findNavLabel = (path: string): string => {
   if (path.startsWith('/consultations/workspace')) return 'Rapid Consultation';
   if (path.startsWith('/queue')) return 'Patient Queue';
-  if (path.startsWith('/prescriptions/new') || path.startsWith('/prescriptions/repeat')) return 'Medicines';
+  if (path.startsWith('/prescriptions/new')) return 'Medicines';
   for (const section of navSections) {
     const match = section.items.find((item) => path.startsWith(item.path));
     if (match) return match.label;
