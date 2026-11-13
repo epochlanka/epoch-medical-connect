@@ -1,4 +1,8 @@
+import { NavLink as AppNavLink } from 'react-router-dom';
 import { WsNavLink as NavLink } from '../../../../app/WorkspaceContext';
+import { WORKSPACES, workspaceHome } from '../../../../app/workspaces';
+import { useAuth } from '../../context/AuthContext';
+import { SettingsIcon } from './Icons';
 import { navSections } from './navConfig';
 
 const BrandMark = () => (
@@ -13,6 +17,7 @@ interface SidebarProps {
 }
 
 const Sidebar = ({ open, onNavigate }: SidebarProps) => {
+  const { user } = useAuth();
   return (
     <aside className={`shell-sidebar${open ? ' open' : ''}`}>
       <div className="shell-brand">
@@ -42,6 +47,16 @@ const Sidebar = ({ open, onNavigate }: SidebarProps) => {
             ))}
           </div>
         ))}
+        {/* Administrators also use this workspace; give them the way back. */}
+        {user?.role === 'Admin' && (
+          <div className="shell-nav-section">
+            <div className="shell-nav-label">ADMINISTRATION</div>
+            <AppNavLink to={workspaceHome(WORKSPACES.admin)} onClick={onNavigate} className="shell-nav-link">
+              <SettingsIcon />
+              Back to Administration
+            </AppNavLink>
+          </div>
+        )}
       </nav>
     </aside>
   );

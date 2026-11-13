@@ -111,8 +111,8 @@ const Topbar = ({ title, onMenuClick }: TopbarProps) => {
           <button className="shell-user" onClick={() => toggle('user')}>
             <div className="shell-avatar">{initials(user?.username || 'U')}</div>
             <div className="shell-user-text">
-              <span className="shell-user-name">{user ? `Dr. ${user.username}` : 'Doctor'}</span>
-              <span className="shell-user-role">Doctor</span>
+              <span className="shell-user-name">{user ? (user.role === 'Doctor' ? `Dr. ${user.username}` : user.username) : 'Doctor'}</span>
+              <span className="shell-user-role">{user?.role ?? 'Doctor'}</span>
             </div>
             <ChevronDownIcon />
           </button>

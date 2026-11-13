@@ -378,8 +378,10 @@ export const getRecentPrescriptions = async (limit = 5) => {
 };
 
 // ---- Doctor Dashboard (own appointments/consultations/prescriptions only) -----------------
+// An administrator using the clinical workspace passes no doctor: Prisma drops `undefined`
+// filters, so every count then covers all doctors.
 
-export const getDoctorDashboard = async (doctorId: number) => {
+export const getDoctorDashboard = async (doctorId: number | undefined) => {
   const todayStart = startOfDay();
   const todayEnd = endOfDay();
   const yesterdayStart = addDays(todayStart, -1);

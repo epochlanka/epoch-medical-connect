@@ -19,7 +19,7 @@ const router = Router();
 router.use(requireAuth);
 router.use(requireRole(['Admin', 'Doctor', 'Pharmacist', 'Receptionist']));
 
-router.get('/doctor-overview', requireRole(['Doctor']), doctorDashboard);
+router.get('/doctor-overview', requireRole(['Admin', 'Doctor']), doctorDashboard);
 router.get('/receptionist-overview', requireRole(['Receptionist']), receptionistDashboard);
 router.get('/pharmacist-overview', requireRole(['Pharmacist']), pharmacistDashboard);
 

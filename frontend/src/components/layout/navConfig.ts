@@ -5,9 +5,6 @@ import {
   FamiliesIcon,
   CalendarIcon,
   StethoscopeIcon,
-  PrescriptionIcon,
-  PharmacyIcon,
-  MedicineIcon,
   StockIcon,
   PurchaseOrderIcon,
   SupplierIcon,
@@ -26,6 +23,8 @@ export interface NavItem {
   path: string;
   icon: ComponentType;
   implemented?: boolean;
+  /** `path` is a full app path in another workspace ('/doctor/...'), not an admin page. */
+  otherWorkspace?: boolean;
 }
 
 export interface NavSection {
@@ -43,17 +42,20 @@ export const navSections: NavSection[] = [
       { label: 'Appointments', path: '/appointments', icon: CalendarIcon, implemented: true },
       { label: 'Live Queue', path: '/queue', icon: CalendarIcon, implemented: true },
       { label: 'Book Appointment', path: '/book-appointment', icon: CalendarIcon, implemented: true },
-      { label: 'Consultations', path: '/consultations', icon: StethoscopeIcon, implemented: true },
-      { label: 'Prescriptions', path: '/prescriptions', icon: PrescriptionIcon, implemented: true },
       { label: 'Lab Test Orders', path: '/lab-test-orders', icon: ClipboardIcon, implemented: true },
+    ],
+  },
+  {
+    label: 'Clinical',
+    items: [
+      // Visits and prescriptions are written in the clinical (doctor) workspace.
+      { label: 'Clinical workspace', path: '/doctor/dashboard', icon: StethoscopeIcon, implemented: true, otherWorkspace: true },
     ],
   },
   {
     label: 'Inventory',
     items: [
-      { label: 'Pharmacy', path: '/pharmacy', icon: PharmacyIcon, implemented: true },
-      { label: 'Medicines', path: '/inventory/medicines', icon: MedicineIcon, implemented: true },
-      { label: 'Stock Management', path: '/inventory/stock', icon: StockIcon, implemented: true },
+      { label: 'Medicines & Stock', path: '/inventory/stock', icon: StockIcon, implemented: true },
       { label: 'Purchase Orders', path: '/inventory/purchase-orders', icon: PurchaseOrderIcon, implemented: true },
       { label: 'Suppliers', path: '/suppliers', icon: SupplierIcon, implemented: true },
     ],

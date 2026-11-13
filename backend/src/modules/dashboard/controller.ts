@@ -104,8 +104,7 @@ export const recentPrescriptions = async (req: Request, res: Response) => {
 
 export const doctorDashboard = async (req: Request, res: Response) => {
   try {
-    const user = req.user as any;
-    const data = await getDoctorDashboard(user.user_id);
+    const data = await getDoctorDashboard(doctorScope(req));
     res.status(200).json(data);
   } catch (error: any) {
     return respondWithServerError(req, res, error, 'dashboard');

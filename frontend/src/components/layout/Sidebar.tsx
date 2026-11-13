@@ -39,7 +39,7 @@ const Sidebar = ({ open, onNavigate }: SidebarProps) => {
             {section.items.map((item) => (
               <NavLink
                 key={item.path}
-                to={toPath(item.path)}
+                to={item.otherWorkspace ? item.path : toPath(item.path)}
                 onClick={onNavigate}
                 className={({ isActive }) => `shell-nav-link${isActive ? ' active' : ''}`}
               >

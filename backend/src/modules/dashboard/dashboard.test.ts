@@ -98,9 +98,19 @@ describe('Dashboard API', () => {
   });
 
   describe('GET /dashboard/doctor-overview', () => {
-    it('rejects a non-Doctor role, even Admin', async () => {
-      const res = await request(app).get('/api/v1/dashboard/doctor-overview').set('Authorization', `Bearer ${token}`);
+    it('rejects roles outside the clinical workspace', async () => {
+      const res = await request(app).get('/api/v1/dashboard/doctor-overview').set('Authorization', `Bearer ${pharmacistToken}`);
       expect(res.status).toBe(403);
+    });
+
+    it('gives an administrator the same dashboard across every doctor', async () => {
+      const [admin, doctor] = await Promise.all([
+        request(app).get('/api/v1/dashboard/doctor-overview').set('Authorization', `Bearer ${token}`),
+        request(app).get('/api/v1/dashboard/doctor-overview').set('Authorization', `Bearer ${doctorToken}`),
+      ]);
+      expect(admin.status).toBe(200);
+      expect(admin.body.kpis.totalAppointmentsToday).toBeGreaterThanOrEqual(doctor.body.kpis.totalAppointmentsToday);
+      expect(admin.body.kpis.prescriptionsIssuedToday).toBeGreaterThanOrEqual(doctor.body.kpis.prescriptionsIssuedToday);
     });
 
     it("returns the doctor's own dashboard with kpis, schedule, trend, and recent prescriptions", async () => {

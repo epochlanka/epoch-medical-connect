@@ -92,7 +92,7 @@ const Dashboard = () => {
     <div className="rapid-dashboard">
       <div className="rapid-header">
         <div>
-          <h1>Good {now.getHours() < 12 ? 'morning' : now.getHours() < 17 ? 'afternoon' : 'evening'}, Dr. {user?.username}</h1>
+          <h1>Good {now.getHours() < 12 ? 'morning' : now.getHours() < 17 ? 'afternoon' : 'evening'}, {user?.role === 'Doctor' ? 'Dr. ' : ''}{user?.username}</h1>
           <span className="rapid-eyebrow">{dateLabel}</span>
         </div>
         <button className="rapid-refresh" onClick={refresh} aria-label="Refresh clinical day"><RefreshIcon /> Refresh</button>

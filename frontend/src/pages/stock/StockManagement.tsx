@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useApiData } from '../../hooks/useApiData';
-import { getCatalogMeta, getMedicineStats, updateMedicine } from '../../lib/medicines';
+import { getCatalogMeta, getMedicineStats, listMedicineCatalog, updateMedicine } from '../../lib/medicines';
 import type { MedicineCatalogRow } from '../../lib/medicines';
 import {
   MedicineIcon,
@@ -15,7 +15,9 @@ import {
   AdjustIcon,
   PurchaseOrderIcon,
   StockIcon,
+  DownloadIcon,
 } from '../../components/layout/Icons';
+import { WsLink } from '../../app/WorkspaceContext';
 import KpiCard from '../dashboard/KpiCard';
 import StockOverviewDonut from '../pharmacy/StockOverviewDonut';
 import MedicineFormModal from '../pharmacy/MedicineFormModal';
@@ -129,6 +131,39 @@ const StockManagement = () => {
     refreshAll();
   };
 
+  // The whole catalogue (active and inactive) as a spreadsheet.
+  const [exporting, setExporting] = useState(false);
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const all = await listMedicineCatalog({ status: 'all', page: 1, limit: 2000 });
+      const header = ['Medicine Name', 'Brand', 'Generic Name', 'Category', 'Base Unit', 'Current Stock', 'Min Stock', 'Max Stock', 'Sell Price', 'Status', 'Nearest Expiry'];
+      const escape = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+      const body = all.data.map((m) => [
+        m.name,
+        m.brand_name ?? '',
+        m.generic_name ?? '',
+        m.category ?? '',
+        m.base_unit,
+        String(m.totalQty),
+        String(m.reorder_level),
+        String(m.max_stock_level || ''),
+        m.sell_price.toFixed(2),
+        m.is_active ? 'Active' : 'Inactive',
+        m.nearestExpiry ?? '',
+      ]);
+      const csv = [header, ...body].map((r) => r.map(escape).join(',')).join('\r\n');
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `medicine-stock-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const donutSegments = stats
     ? [
         { label: 'In Stock', value: stats.inStock, color: '#22c55e' },
@@ -142,10 +177,13 @@ const StockManagement = () => {
     <div>
       <div className="pat-header">
         <div>
-          <h1>Stock Management</h1>
-          <p>Home &gt; Stock Management</p>
+          <h1>Medicines &amp; Stock</h1>
+          <p>The medicine catalogue, stock levels, batches and expiry.</p>
         </div>
         <div className="pat-header-actions">
+          <button className="pat-btn" onClick={handleExport} disabled={exporting}>
+            <DownloadIcon /> {exporting ? 'Exporting…' : 'Export'}
+          </button>
           <button className="pat-btn" onClick={() => setAdjustMedicine(null)}>
             <AdjustIcon /> Stock Adjustment
           </button>
@@ -243,9 +281,9 @@ const StockManagement = () => {
             </div>
             {statsLoading && <div className="card-empty">Loading…</div>}
             {stats && <StockOverviewDonut segments={donutSegments} total={stats.totalMedicines} />}
-            <a href="/reports" className="pat-btn" style={{ marginTop: 14, justifyContent: 'center' }}>
+            <WsLink to="/reports" className="pat-btn" style={{ marginTop: 14, justifyContent: 'center' }}>
               View Full Report
-            </a>
+            </WsLink>
           </div>
 
           <div className="card">

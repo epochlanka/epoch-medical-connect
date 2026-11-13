@@ -87,7 +87,9 @@ export const WORKSPACES: Record<WorkspaceId, Workspace> = {
 // Receptionist + Pharmacist, with no doctor or administrator privileges. Keep the two in step —
 // this table is for navigation only, the backend is what actually enforces access.
 const ROLE_WORKSPACES: Record<UserRole, readonly WorkspaceId[]> = {
-  Admin: ['admin'],
+  // An administrator can also see patients: the clinical workspace is the one place visits and
+  // prescriptions are written, so admin has no separate copy of those pages.
+  Admin: ['admin', 'doctor'],
   Doctor: ['doctor'],
   Receptionist: ['reception'],
   Pharmacist: ['pharmacy'],
