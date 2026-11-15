@@ -9,7 +9,6 @@ import {
   WORKSPACES,
 } from './workspaces';
 import { WorkspaceProvider } from './WorkspaceContext';
-import { PatientPanelProvider } from '../shared/patients/PatientPanel';
 
 /**
  * Route protection here is for usability — showing people only what they can use, and sending them
@@ -42,9 +41,7 @@ export const RequireWorkspace = ({ id, children }: { id: WorkspaceId; children: 
   if (!workspace.migrated) return <LegacyPortalHandoff workspaceId={id} />;
 
   return (
-    <WorkspaceProvider workspace={workspace}>
-      <PatientPanelProvider>{children}</PatientPanelProvider>
-    </WorkspaceProvider>
+    <WorkspaceProvider workspace={workspace}>{children}</WorkspaceProvider>
   );
 };
 

@@ -663,3 +663,26 @@
 .rxp-label-preview { font-size: 13px; color: var(--ink-muted); }
 .rxp-item-fields-more { margin-top: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .rxp-qty-note.hint { color: var(--ink-soft); }
+
+/* Frequency: the list, or the doctor's own wording with a way back to the list. */
+.freq-custom {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  min-width: 0;
+}
+.freq-custom input {
+  flex: 1;
+  min-width: 0;
+}
+.freq-back {
+  flex-shrink: 0;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  border-radius: 8px;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: #334155;
+  cursor: pointer;
+}

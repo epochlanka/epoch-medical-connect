@@ -402,8 +402,21 @@ export const cancelLabTestOrder = async (id: number) => {
 
 // Printing never changes status — only stamps who/when for audit (business rule: printing a
 // request letter is not a clinical action).
-export const stampPrinted = (id: number, actor: Actor) =>
-  prisma.labTestOrder.update({ where: { lab_test_order_id: id }, data: { printed_at: new Date(), printed_by: actor.user_id } });
+export const stampPrinted = (ids: number[], actor: Actor) =>
+  prisma.labTestOrder.updateMany({ where: { lab_test_order_id: { in: ids } }, data: { printed_at: new Date(), printed_by: actor.user_id } });
+
+/** What goes on one printed request: every test still active from the same visit, in the order they were added. A cancelled test prints on its own. */
+export const ordersForRequestSheet = async (id: number) => {
+  const order = await getLabTestOrderById(id);
+  if (!order) return null;
+  if (order.status === 'Cancelled' || !order.consultation_id) return [order];
+  const all = await prisma.labTestOrder.findMany({
+    where: { consultation_id: order.consultation_id, patient_id: order.patient_id, status: { not: 'Cancelled' } },
+    include: detailInclude,
+    orderBy: { lab_test_order_id: 'asc' },
+  });
+  return all.length > 0 ? all : [order];
+};
 
 // ---- Add Lab Test panel context (doctor-frontend consultation workspace) ------------------
 

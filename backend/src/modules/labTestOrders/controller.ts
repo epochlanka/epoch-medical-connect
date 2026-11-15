@@ -1,3 +1,4 @@
+import { prisma } from '../../lib/prisma';
 import { Request, Response } from 'express';
 import * as service from './service';
 import { streamLabTestRequestPdf, streamLabResultReportPdf } from './pdf';
@@ -132,12 +133,13 @@ export const cancel = async (req: Request, res: Response) => {
 
 export const printRequest = async (req: Request, res: Response) => {
   try {
-    const order = await service.getLabTestOrderById(Number(req.params.labTestOrderId));
-    if (!order) return res.status(404).json({ message: 'Lab test order not found' });
-    await service.stampPrinted(order.lab_test_order_id, actor(req));
+    const orders = await service.ordersForRequestSheet(Number(req.params.labTestOrderId));
+    if (!orders) return res.status(404).json({ message: 'Lab test order not found' });
+    await service.stampPrinted(orders.map((o) => o.lab_test_order_id), actor(req));
+    const clinic = await prisma.clinicSettings.findUnique({ where: { id: 1 } });
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="LabTestRequest-${order.lab_test_order_id}.pdf"`);
-    streamLabTestRequestPdf(order, res);
+    res.setHeader('Content-Disposition', `inline; filename="LabTestRequest-${req.params.labTestOrderId}.pdf"`);
+    streamLabTestRequestPdf(orders, res, clinic);
   } catch (error) {
     handleError(req, res, error);
   }
@@ -149,8 +151,9 @@ export const printResult = async (req: Request, res: Response) => {
     if (!order) return res.status(404).json({ message: 'Lab test order not found' });
     if (order.status !== 'Completed') return res.status(400).json({ message: 'This order has no completed result to print yet' });
     res.setHeader('Content-Type', 'application/pdf');
+    const clinic = await prisma.clinicSettings.findUnique({ where: { id: 1 } });
     res.setHeader('Content-Disposition', `inline; filename="LabResult-${order.lab_test_order_id}.pdf"`);
-    streamLabResultReportPdf(order, res);
+    streamLabResultReportPdf(order, res, clinic);
   } catch (error) {
     handleError(req, res, error);
   }

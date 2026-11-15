@@ -366,4 +366,18 @@ describe('Lab Test Orders API', () => {
       expect(await prisma.labTestCatalog.count({ where: { test_name: { equals: typedName, mode: 'insensitive' } } })).toBe(1);
     });
   });
+  it('prints every test from the same visit on one request sheet', async () => {
+    const created = await makeDraftConsultation(doctorToken, doctorId);
+    const ids: number[] = [];
+    for (const name of ['Lipid Profile', 'HbA1c', 'Serum Creatinine']) {
+      const r = await request(app).post('/api/v1/lab-test-orders').set('Authorization', `Bearer ${doctorToken}`).send({ consultation_id: created.consultationId, test_name: name });
+      ids.push(r.body.lab_test_order_id);
+    }
+    await request(app).post(`/api/v1/lab-test-orders/${ids[2]}/cancel`).set('Authorization', `Bearer ${doctorToken}`).expect(200);
+    const pdf = await request(app).get(`/api/v1/lab-test-orders/${ids[1]}/print`).set('Authorization', `Bearer ${receptionistToken}`);
+    expect(pdf.status).toBe(200);
+    expect(pdf.headers['content-type']).toContain('application/pdf');
+    const rows = await prisma.labTestOrder.findMany({ where: { lab_test_order_id: { in: ids } }, orderBy: { lab_test_order_id: 'asc' } });
+    expect(rows.map((r) => !!r.printed_at)).toEqual([true, true, false]);
+  });
 });

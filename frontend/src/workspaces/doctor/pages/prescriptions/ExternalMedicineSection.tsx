@@ -11,8 +11,8 @@ import InstructionsPicker from '../../components/InstructionsPicker';
 import { doseProfile, composeDosage, amountFromDosage } from '../../lib/doseForms';
 import { PlusIcon, SearchIcon, EditIcon, TrashIcon, XIcon, PillIcon, PrintIcon } from '../../components/layout/Icons';
 import './externalMedicines.css';
+import FrequencyPicker from './FrequencyPicker';
 
-const FREQUENCY_OPTIONS = ['OD - Once Daily', 'BD - Twice Daily', 'TDS - Three times daily', 'QID - Four times daily', 'PRN - As needed', 'STAT', 'HS - At bedtime'];
 const DURATION_OPTIONS = ['3 Days', '5 Days', '7 Days', '10 Days', '14 Days', '1 Month', 'Ongoing'];
 
 // Mirrors backend/src/modules/prescriptions/qtyCalc.ts, same copy as NewPrescription.tsx uses.
@@ -734,7 +734,7 @@ const AddExternalMedicineModal = ({
               )}
               <div className="modal-field">
                 <label>Frequency</label>
-                <input list="ext-frequency-options" value={draft.frequency} onChange={(e) => updateSchedule('frequency', e.target.value)} placeholder="TDS" />
+                <FrequencyPicker value={draft.frequency} onChange={(v) => updateSchedule('frequency', v)} />
               </div>
             </div>
 
@@ -817,11 +817,6 @@ const AddExternalMedicineModal = ({
               Long-term medicine <small>— keep it on the patient's ongoing list until a doctor stops it</small>
             </label>
 
-            <datalist id="ext-frequency-options">
-              {FREQUENCY_OPTIONS.map((o) => (
-                <option key={o} value={o} />
-              ))}
-            </datalist>
             <datalist id="ext-duration-options">
               {DURATION_OPTIONS.map((o) => (
                 <option key={o} value={o} />

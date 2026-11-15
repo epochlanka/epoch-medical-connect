@@ -12,11 +12,16 @@ const calculateAge = (dob: Date, at: Date = new Date()) => {
   return age;
 };
 
-const header = (doc: PDFKit.PDFDocument, subtitle: string) => {
-  doc.fontSize(16).font('Helvetica-Bold').text('EPOCH MEDICAL SYSTEM', { align: 'center' });
-  doc.fontSize(10).font('Helvetica').fillColor('#555').text(CLINIC_NAME, { align: 'center' });
-  doc.text(CLINIC_ADDRESS, { align: 'center' });
-  doc.text(`Tel: ${CLINIC_PHONE}`, { align: 'center' });
+// The clinic's own name and address from Settings; the built-in sample details only when none are set.
+const header = (doc: PDFKit.PDFDocument, subtitle: string, clinic?: { clinic_name?: string | null; clinic_address?: string | null } | null) => {
+  doc.fontSize(16).font('Helvetica-Bold').text(clinic?.clinic_name || CLINIC_NAME, { align: 'center' });
+  doc.fontSize(10).font('Helvetica').fillColor('#555');
+  if (clinic?.clinic_name) {
+    if (clinic.clinic_address) doc.text(clinic.clinic_address, { align: 'center' });
+  } else {
+    doc.text(CLINIC_ADDRESS, { align: 'center' });
+    doc.text(`Tel: ${CLINIC_PHONE}`, { align: 'center' });
+  }
   doc.fillColor('black').moveDown(0.3);
   doc.fontSize(12).font('Helvetica-Bold').text(subtitle, { align: 'center' });
   doc.font('Helvetica');
@@ -27,43 +32,43 @@ const header = (doc: PDFKit.PDFDocument, subtitle: string) => {
 };
 
 // Document 1 — Laboratory Investigation Request, printed before the patient goes to the lab.
-export const streamLabTestRequestPdf = (order: any, res: Response) => {
+// Every test ordered at the same visit goes on one sheet: the lab gets one request, not one page
+// per test. `orders` all belong to one patient and visit; the first is the one printed from.
+const PRIORITY_RANK: Record<string, number> = { Routine: 0, Urgent: 1, STAT: 2 };
+
+export const streamLabTestRequestPdf = (orders: any[], res: Response, clinic?: { clinic_name?: string | null; clinic_address?: string | null } | null) => {
   const doc = new PDFDocument({ margin: 50 });
   doc.pipe(res);
 
-  const patient = order.patient;
-  const doctor = order.doctor;
-  const requestNo = order.request_number || `LAB${String(order.lab_test_order_id).padStart(6, '0')}`;
+  const first = orders[0];
+  const patient = first.patient;
+  const doctor = first.doctor;
+  const requestNo = (o: any) => o.request_number || `LAB${String(o.lab_test_order_id).padStart(6, '0')}`;
+  const priority = orders.reduce((top: string, o: any) => ((PRIORITY_RANK[o.priority] ?? 0) > (PRIORITY_RANK[top] ?? 0) ? o.priority : top), 'Routine');
 
-  header(doc, 'LABORATORY INVESTIGATION REQUEST');
+  header(doc, 'LABORATORY INVESTIGATION REQUEST', clinic);
 
   doc.fontSize(10.5);
   doc.text(`Patient Name: ${patient.full_name}`);
   doc.text(`Patient ID: ${patient.patient_id}     Age: ${calculateAge(new Date(patient.dob))}     Gender: ${patient.gender}`);
   if (patient.phone) doc.text(`Contact Number: ${patient.phone}`);
-  doc.text(`Date: ${new Date(order.order_date).toISOString().slice(0, 10)}`);
-  doc.text(`Visit / Consultation No: ${order.consultation_id}`);
-  doc.text(`Request No: ${requestNo}`);
-  doc.text(`Priority: ${order.priority}`);
+  doc.text(`Date: ${new Date(first.order_date).toISOString().slice(0, 10)}`);
+  doc.text(`Visit / Consultation No: ${first.consultation_id}`);
+  doc.text(`Request No: ${orders.map(requestNo).join(', ')}`);
+  doc.text(`Priority: ${priority}`);
   doc.moveDown(0.7);
 
-  doc.fontSize(12).font('Helvetica-Bold').text('Requested Investigations', { underline: true });
-  doc.font('Helvetica').fontSize(11);
+  doc.fontSize(12).font('Helvetica-Bold').text(`Requested Investigations (${orders.length})`, { underline: true });
   doc.moveDown(0.3);
-  doc.text(`1. ${order.test_name}${order.test_category ? ` (${order.test_category})` : ''}`);
+  orders.forEach((o, i) => {
+    doc.font('Helvetica-Bold').fontSize(11).text(`${i + 1}. ${o.test_name}${o.test_category ? ` (${o.test_category})` : ''}${o.priority !== 'Routine' ? `  [${o.priority}]` : ''}`);
+    doc.font('Helvetica').fontSize(10);
+    if (o.instructions) doc.text(`Instructions: ${o.instructions}`, { indent: 14 });
+    if (o.additional_notes) doc.text(`Clinical notes: ${o.additional_notes}`, { indent: 14 });
+    doc.moveDown(0.25);
+  });
 
-  if (order.instructions) {
-    doc.moveDown(0.5);
-    doc.fontSize(10.5).font('Helvetica-Bold').text("Doctor's Instructions:");
-    doc.font('Helvetica').text(order.instructions);
-  }
-  if (order.additional_notes) {
-    doc.moveDown(0.5);
-    doc.fontSize(10.5).font('Helvetica-Bold').text('Clinical Notes / Reason:');
-    doc.font('Helvetica').text(order.additional_notes);
-  }
-
-  doc.moveDown(1.5);
+  doc.moveDown(1.2);
   doc.fontSize(10.5);
   doc.text(`Doctor Name: ${doctor.username}`);
   if (doctor.registration_number) doc.text(`Registration No: ${doctor.registration_number}`);
@@ -77,14 +82,14 @@ export const streamLabTestRequestPdf = (order: any, res: Response) => {
   doc.strokeColor('black');
 
   doc.moveDown(6);
-  doc.fontSize(8).fillColor('#94a3b8').text(`Reference: ${requestNo}`, { align: 'right' });
+  doc.fontSize(8).fillColor('#94a3b8').text(`Reference: ${orders.map(requestNo).join(', ')}`, { align: 'right' });
 
   doc.end();
 };
 
 // Document 2 — Laboratory Result / Review Report, available once the doctor has completed the
 // order (entered values + reviewed). Separate document from the request letter above.
-export const streamLabResultReportPdf = (order: any, res: Response) => {
+export const streamLabResultReportPdf = (order: any, res: Response, clinic?: { clinic_name?: string | null; clinic_address?: string | null } | null) => {
   const doc = new PDFDocument({ margin: 50 });
   doc.pipe(res);
 
@@ -92,7 +97,7 @@ export const streamLabResultReportPdf = (order: any, res: Response) => {
   const doctor = order.doctor;
   const requestNo = order.request_number || `LAB${String(order.lab_test_order_id).padStart(6, '0')}`;
 
-  header(doc, 'LABORATORY RESULT / REVIEW REPORT');
+  header(doc, 'LABORATORY RESULT / REVIEW REPORT', clinic);
 
   doc.fontSize(10.5);
   doc.text(`Patient Name: ${patient.full_name}`);

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
+import BackButton from '../../../../components/BackButton';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import { findNavLabel } from './navConfig';
@@ -22,6 +23,7 @@ const AppLayout = () => {
       <div className="shell-main">
         <Topbar title={findNavLabel(localPath)} onMenuClick={() => setSidebarOpen((v) => !v)} />
         <main className="shell-content">
+          <BackButton />
           <Outlet />
         </main>
       </div>

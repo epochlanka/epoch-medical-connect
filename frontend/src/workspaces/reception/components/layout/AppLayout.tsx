@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useWorkspace } from '../../frontDesk/WorkspaceContext';
+import BackButton from '../../../../components/BackButton';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import './app-shell.css';
@@ -18,7 +19,10 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
       <div className={`shell-backdrop${sidebarOpen ? ' open' : ''}`} onClick={() => setSidebarOpen(false)} />
       <div className="shell-main">
         <Topbar onMenuClick={() => setSidebarOpen((v) => !v)} />
-        <div className="shell-content">{children}</div>
+        <div className="shell-content">
+          <BackButton />
+          {children}
+        </div>
       </div>
     </div>
   );

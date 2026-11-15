@@ -39,6 +39,7 @@ import '../../styles/shared.css';
 import '../queue/queue.css';
 import '../consultations/consultation.css';
 import './prescriptions.css';
+import FrequencyPicker from './FrequencyPicker';
 
 const initials = (name: string) =>
   name
@@ -52,7 +53,6 @@ const formatDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, 
 const formatDateTime = (iso: string) => new Date(iso).toLocaleString(undefined, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 const formatTime = (d: Date) => d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-const FREQUENCY_OPTIONS = ['OD - Once Daily', 'BD - Twice Daily', 'TDS - Three times daily', 'QID - Four times daily', 'PRN - As needed', 'STAT', 'HS - At bedtime'];
 const DURATION_OPTIONS = ['3 Days', '5 Days', '7 Days', '10 Days', '14 Days', '1 Month', 'Ongoing'];
 
 // Mirrored server-side in backend/src/modules/prescriptions/qtyCalc.ts — this copy drives instant
@@ -1122,12 +1122,10 @@ const Builder = ({ consultationId }: { consultationId: number }) => {
                         )}
                         <label className="rxp-item-field">
                           <span>Frequency</span>
-                          <input
+                          <FrequencyPicker
                             className="rxb-table-input"
-                            list="rxp-frequency-options"
                             value={it.frequency}
-                            onChange={updateFreqOrDuration(it.key, 'frequency')}
-                            placeholder="TDS"
+                            onChange={(v) => updateFreqOrDuration(it.key, 'frequency')({ target: { value: v } } as React.ChangeEvent<HTMLInputElement>)}
                           />
                         </label>
                         <label className="rxp-item-field">
@@ -1232,11 +1230,6 @@ const Builder = ({ consultationId }: { consultationId: number }) => {
                 })}
               </ol>
             )}
-            <datalist id="rxp-frequency-options">
-              {FREQUENCY_OPTIONS.map((o) => (
-                <option key={o} value={o} />
-              ))}
-            </datalist>
             <datalist id="rxp-duration-options">
               {DURATION_OPTIONS.map((o) => (
                 <option key={o} value={o} />

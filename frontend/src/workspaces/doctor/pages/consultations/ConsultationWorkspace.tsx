@@ -1239,9 +1239,16 @@ const Workspace = ({ appointmentId }: { appointmentId: number }) => {
             <div className="cons-box">
               <div className="cons-box-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                 <span>Lab tests for this visit</span>
-                <button className="cons-btn primary" disabled={(!consultationId && !canEdit) || saving} onClick={() => void openLabTests()}>
-                  <ClipboardIcon /> Order lab tests
-                </button>
+                <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {labTestOrders.some((o) => o.status !== 'Cancelled') && (
+                    <button className="cons-btn" onClick={() => printLabTestOrder(labTestOrders.find((o) => o.status !== 'Cancelled')!.lab_test_order_id)} title="All of this visit's tests on one page">
+                      <PrintIcon /> Print request{labTestOrders.filter((o) => o.status !== 'Cancelled').length > 1 ? ` (all ${labTestOrders.filter((o) => o.status !== 'Cancelled').length} tests, one page)` : ''}
+                    </button>
+                  )}
+                  <button className="cons-btn primary" disabled={(!consultationId && !canEdit) || saving} onClick={() => void openLabTests()}>
+                    <ClipboardIcon /> Order lab tests
+                  </button>
+                </span>
               </div>
               <p className="pat-muted" style={{ fontSize: 13, margin: '0 0 10px' }}>
                 Order tests here. When the report is back, press <strong>Enter results</strong> on the test to fill in its values.
@@ -1263,9 +1270,11 @@ const Workspace = ({ appointmentId }: { appointmentId: number }) => {
                     </span>
                   </span>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    <button className="pat-btn" style={{ fontSize: 13, padding: '5px 9px' }} onClick={() => printLabTestOrder(o.lab_test_order_id)}>
-                      <PrintIcon /> Print Request
-                    </button>
+                    {o.status === 'Cancelled' && (
+                      <button className="pat-btn" style={{ fontSize: 13, padding: '5px 9px' }} onClick={() => printLabTestOrder(o.lab_test_order_id)}>
+                        <PrintIcon /> Print Request
+                      </button>
+                    )}
                     {(o.status === 'Pending' || o.status === 'Report Received') && (
                       <button className="pat-btn primary" style={{ fontSize: 13, padding: '5px 9px' }} onClick={() => void enterLabResults(o)}>
                         <ClipboardIcon /> Enter results

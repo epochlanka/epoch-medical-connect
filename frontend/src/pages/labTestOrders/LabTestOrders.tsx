@@ -217,7 +217,7 @@ const LabTestOrders = () => {
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        <button className="pat-icon-btn" onClick={() => printLabTestOrder(o.lab_test_order_id)} aria-label="Print request">
+                        <button className="pat-icon-btn" onClick={() => printLabTestOrder(o.lab_test_order_id)} title="Prints every test from this visit on one page" aria-label="Print request (all tests from this visit, one page)">
                           <PrintIcon />
                         </button>
                         {o.status === 'Pending' && (

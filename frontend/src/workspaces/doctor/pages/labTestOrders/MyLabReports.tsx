@@ -120,7 +120,7 @@ const MyLabReports = () => {
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', minWidth: 230 }}>
-                      <button className="pat-btn" style={{ fontSize: 13, padding: '4px 8px' }} onClick={() => printLabTestOrder(o.lab_test_order_id)}>
+                      <button className="pat-btn" style={{ fontSize: 13, padding: '4px 8px' }} onClick={() => printLabTestOrder(o.lab_test_order_id)} title="Prints every test from this visit on one page">
                         <PrintIcon /> Request
                       </button>
                       {(o.status === 'Pending' || o.status === 'Report Received') && (
