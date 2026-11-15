@@ -115,6 +115,38 @@ describe('Saved outside medicines', () => {
     expect((await search(doctorToken, name)).body).toHaveLength(1);
   });
 
+  it('saves a medicine as soon as it is added, so the next search finds it, and counts it once prescribed', async () => {
+    const fresh = `Qbrexza Cloth ${runId}`;
+    const saved = await request(app)
+      .post('/api/v1/external-medicines/library')
+      .set('Authorization', `Bearer ${doctorToken}`)
+      .send({ medicine_name: `  ${fresh} `, dosage_form: 'Other', quantity_unit: 'pack', dosage: 'Apply to underarms', frequency: 'OD' });
+    expect(saved.status).toBe(200);
+    expect(saved.body).toMatchObject({ medicineName: fresh, useCount: 0, dosage: 'Apply to underarms' });
+
+    // Found by any part of the name, from the first letters typed.
+    const found = await search(doctorToken, 'qbr');
+    expect(found.body.some((e: any) => e.medicineName === fresh)).toBe(true);
+
+    // Adding it again before saving the prescription does not count as a use...
+    await request(app).post('/api/v1/external-medicines/library').set('Authorization', `Bearer ${doctorToken}`).send({ medicine_name: fresh, dosage_form: 'Other', quantity_unit: 'pack' }).expect(200);
+    // ...saving the prescription does.
+    const rx = await prescriptionFor();
+    await request(app)
+      .post(`/api/v1/external-medicines/prescription/${rx}/bulk`)
+      .set('Authorization', `Bearer ${doctorToken}`)
+      .send({ items: [line({ medicine_name: fresh, dosage_form: 'Other', quantity_unit: 'pack' })] })
+      .expect(201);
+    expect((await prisma.externalMedicineLibrary.findUniqueOrThrow({ where: { name_key: fresh.toLowerCase() } })).use_count).toBe(1);
+  });
+
+  it('refuses to save a medicine with no name, or for a pharmacist', async () => {
+    const noName = await request(app).post('/api/v1/external-medicines/library').set('Authorization', `Bearer ${doctorToken}`).send({ medicine_name: '  ', dosage_form: 'Tablet', quantity_unit: 'tablets' });
+    expect(noName.status).toBe(400);
+    const pharmacist = await request(app).post('/api/v1/external-medicines/library').set('Authorization', `Bearer ${pharmacistToken}`).send({ medicine_name: 'X', dosage_form: 'Tablet', quantity_unit: 'tablets' });
+    expect(pharmacist.status).toBe(403);
+  });
+
   it('lists the most used ones when nothing is typed, and 404s an unknown entry', async () => {
     const top = await search(doctorToken);
     expect(top.status).toBe(200);

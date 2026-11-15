@@ -102,3 +102,11 @@ export const hideLibraryEntry = async (req: Request, res: Response) => {
     handleError(req, res, error);
   }
 };
+
+export const saveToLibrary = async (req: Request, res: Response) => {
+  try {
+    res.status(200).json(await library.saveToLibrary(req.body, actor(req).user_id));
+  } catch (error) {
+    handleError(req, res, error);
+  }
+};

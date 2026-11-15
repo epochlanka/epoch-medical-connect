@@ -7,6 +7,7 @@ import './shared/styles/fields.css'
 import App from './App.tsx'
 import ErrorBoundary from './components/ErrorBoundary.tsx'
 import GlobalErrorToast from './components/GlobalErrorToast.tsx'
+import NewVersionBar from './components/NewVersionBar.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -14,6 +15,7 @@ createRoot(document.getElementById('root')!).render(
       <BrowserRouter>
         <App />
         <GlobalErrorToast />
+        <NewVersionBar />
       </BrowserRouter>
     </ErrorBoundary>
   </StrictMode>,

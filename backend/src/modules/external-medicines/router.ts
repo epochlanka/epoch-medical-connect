@@ -52,6 +52,17 @@ router.post('/prescription/:prescriptionId', requireRole(WRITE_ROLES), validate(
 const librarySearch = z.object({ query: z.object({ search: z.string().max(100).optional() }) });
 const libraryParams = z.object({ params: z.object({ libraryId: z.coerce.number().int().positive() }) });
 router.get('/library', requireRole(WRITE_ROLES), validate(librarySearch), controller.searchLibrary);
+const librarySave = z.object({
+  body: itemSchema
+    .pick({ generic_name: true, brand_name: true, strength: true, dosage: true, dose_qty: true, frequency: true, duration: true, instructions: true, is_long_term: true })
+    .partial()
+    .extend({
+      medicine_name: z.string().trim().min(1, 'Medicine name is required').max(200),
+      dosage_form: z.string().trim().min(1, 'Dosage form is required'),
+      quantity_unit: z.string().trim().min(1, 'Unit is required'),
+    }),
+});
+router.post('/library', requireRole(WRITE_ROLES), validate(librarySave), controller.saveToLibrary);
 router.delete('/library/:libraryId', requireRole(WRITE_ROLES), validate(libraryParams), controller.hideLibraryEntry);
 
 router.get('/patient/:patientId', requireRole(READ_ROLES), validate(patientParams), controller.listByPatient);

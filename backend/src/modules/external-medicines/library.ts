@@ -25,8 +25,13 @@ export interface LibraryLine {
 
 export const libraryKey = (name: string) => name.trim().replace(/\s+/g, ' ').toLowerCase();
 
-/** Records the typed-in lines of one save. Runs inside the caller's transaction. */
-export const rememberExternalMedicines = async (tx: any, lines: LibraryLine[], userId: number) => {
+/**
+ * Records typed-in outside medicines. Runs inside the caller's transaction.
+ * countUse: a prescription was saved with them (adds to "used N times"). Without it — the doctor has
+ * only added the medicine to a prescription still being written — it is saved straight away, so the
+ * next search finds it, but not counted until that prescription is saved.
+ */
+export const rememberExternalMedicines = async (tx: any, lines: LibraryLine[], userId: number, { countUse = true }: { countUse?: boolean } = {}) => {
   for (const line of lines) {
     if (line.medicine_id) continue;
     const name = line.medicine_name.trim().replace(/\s+/g, ' ');
@@ -49,9 +54,9 @@ export const rememberExternalMedicines = async (tx: any, lines: LibraryLine[], u
     };
     await tx.externalMedicineLibrary.upsert({
       where: { name_key: libraryKey(name) },
-      create: { name_key: libraryKey(name), ...details },
+      create: { name_key: libraryKey(name), ...details, use_count: countUse ? 1 : 0 },
       // Prescribing it again puts a removed entry back on the list.
-      update: { ...details, use_count: { increment: 1 }, hidden: false },
+      update: { ...details, ...(countUse ? { use_count: { increment: 1 } } : {}), hidden: false },
     });
   }
 };
@@ -105,4 +110,11 @@ export const hideLibraryEntry = async (libraryId: number, userId: number) => {
     prisma.externalMedicineLibrary.update({ where: { library_id: libraryId }, data: { hidden: true } }),
     prisma.auditLog.create({ data: { user_id: userId, action: 'HIDE_EXTERNAL_MEDICINE_SUGGESTION', entity: 'ExternalMedicineLibrary', entity_id: String(libraryId) } }),
   ]);
+};
+
+/** Saves one outside medicine as soon as the doctor adds it, before the prescription is saved. */
+export const saveToLibrary = async (line: LibraryLine, userId: number) => {
+  await prisma.$transaction((tx) => rememberExternalMedicines(tx, [line], userId, { countUse: false }));
+  const row = await prisma.externalMedicineLibrary.findUnique({ where: { name_key: libraryKey(line.medicine_name) } });
+  return row ? serialize(row) : null;
 };

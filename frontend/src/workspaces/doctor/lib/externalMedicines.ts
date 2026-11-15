@@ -95,3 +95,7 @@ export const searchSavedExternalMedicines = (search: string) =>
 
 /** Takes a saved medicine off the suggestions; past prescriptions are not changed. */
 export const removeSavedExternalMedicine = (libraryId: number) => api.delete(`/external-medicines/library/${libraryId}`);
+
+/** Saves a typed-in outside medicine to the shared list as soon as it is added to a prescription. */
+export const saveExternalMedicineToList = (input: ExternalMedicineInput & { medicine_name: string }) =>
+  api.post<SavedExternalMedicine | null>('/external-medicines/library', input).then((r) => r.data);

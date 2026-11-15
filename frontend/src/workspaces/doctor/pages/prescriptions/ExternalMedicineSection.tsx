@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { searchMedicines } from '../../lib/medicines';
 import type { Medicine } from '../../lib/medicines';
-import { searchSavedExternalMedicines, removeSavedExternalMedicine } from '../../lib/externalMedicines';
+import { searchSavedExternalMedicines, removeSavedExternalMedicine, saveExternalMedicineToList } from '../../lib/externalMedicines';
 import type { ExternalMedicineInput, SavedExternalMedicine } from '../../lib/externalMedicines';
 import { listMasterData, getClinicSettings } from '../../lib/settings';
 import type { ClinicSettings } from '../../lib/settings';
@@ -408,7 +408,6 @@ const AddExternalMedicineModal = ({
   useEffect(() => {
     if (step !== 'search') return;
     const term = searchTerm.trim();
-    if (term.length === 1) return;
     let cancelled = false;
     const t = setTimeout(
       () => {
@@ -546,7 +545,7 @@ const AddExternalMedicineModal = ({
 
             {removeError && <div className="ext-qty-note blocked" role="alert">{removeError}</div>}
 
-            {savedResults.length > 0 && searchTerm.trim().length !== 1 && (
+            {savedResults.length > 0 && (
               <div className="ext-results ext-saved-results">
                 <div className="ext-results-heading">{searchTerm.trim() ? 'Saved outside medicines' : 'Frequently prescribed outside'}</div>
                 {savedResults.map((m) => (
@@ -560,7 +559,7 @@ const AddExternalMedicineModal = ({
                       </div>
                       {savedLine(m) && <div className="ext-result-meta">Last time: {savedLine(m)}</div>}
                     </div>
-                    <span className="ext-saved-uses">Used {m.useCount}×</span>
+                    <span className="ext-saved-uses">{m.useCount > 0 ? `Used ${m.useCount}×` : 'New'}</span>
                     <button
                       type="button"
                       className="pat-icon-btn ext-saved-remove"
@@ -599,7 +598,7 @@ const AddExternalMedicineModal = ({
                     ))}
                   </>
                 )}
-                {!searching && catalogResults.length === 0 && savedResults.length === 0 && (
+                {!searching && catalogResults.length === 0 && savedResults.length === 0 && searchTerm.trim().length >= 2 && (
                   <div className="ext-results-empty">No matches — try "+ Add New External Item" to enter it manually.</div>
                 )}
               </div>
@@ -895,6 +894,11 @@ const ExternalMedicineSection = ({
   };
 
   const handleSave = (draft: ExternalMedicineDraft) => {
+    // A typed-in medicine goes on the clinic's saved list now, not only when the prescription is
+    // saved, so the very next search finds it. Best effort: the prescription never waits on it.
+    if (!draft.medicine_id && draft.medicine_name.trim()) {
+      void saveExternalMedicineToList({ ...draftToInput(draft), medicine_name: draft.medicine_name.trim() }).catch(() => undefined);
+    }
     if (editingKey) {
       onChange(items.map((i) => (i.key === editingKey ? draft : i)));
     } else {
