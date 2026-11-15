@@ -860,3 +860,27 @@
 .rx-final-empty, .rx-final-line { margin: 0; font-size: 14px; color: var(--ink-muted); }
 .rx-final-summary > .rx-final-empty { padding: 10px 14px; border-top: 1px solid var(--line); }
 @media (max-width: 720px) { .rx-final-meds li { grid-template-columns: 1fr; gap: 2px; } }
+
+/* "Lab tests (2)" on the visit's tab, with a dot when a report is back and waiting for its results. */
+.cons-tab-count {
+  display: inline-block;
+  min-width: 20px;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #e0e7ff;
+  color: #3730a3;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+.cons-tab-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 5px;
+  border-radius: 50%;
+  background: #f59e0b;
+  vertical-align: middle;
+}

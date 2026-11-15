@@ -33,7 +33,7 @@ export const navSections: NavSection[] = [
   {
     label: 'Clinical inbox',
     items: [
-      { label: 'Lab Results', path: '/lab-reports/my', icon: HeartPulseIcon, implemented: true },
+      { label: 'Lab Tests & Results', path: '/lab-reports/my', icon: HeartPulseIcon, implemented: true },
       { label: 'Follow-ups Due', path: '/consultations/follow-ups', icon: ClockIcon, implemented: true },
     ],
   },

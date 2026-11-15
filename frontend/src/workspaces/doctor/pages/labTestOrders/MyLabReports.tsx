@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useWorkspaceNavigate as useNavigate } from '../../../../app/WorkspaceContext';
 import { useAuth } from '../../context/AuthContext';
 import { useApiData } from '../../hooks/useApiData';
-import { listLabTestOrders, printLabTestOrder, printLabResultReport } from '../../lib/labTestOrders';
+import { listLabTestOrders, printLabTestOrder, printLabResultReport, markReportReceived } from '../../lib/labTestOrders';
 import type { LabTestOrder, LabTestOrderStatus } from '../../lib/labTestOrders';
 import MarkReceivedModal from './MarkReceivedModal';
 import LabResultModal from './LabResultModal';
@@ -43,16 +43,31 @@ const MyLabReports = () => {
     [user?.id, status, search]
   );
   const { data: result, loading, reload } = useApiData(() => listLabTestOrders(params), [params]);
+  const [actionError, setActionError] = useState<string | null>(null);
+  // One click from a waiting test to its results table: records the report as back if it is not yet.
+  const enterResults = async (o: LabTestOrder) => {
+    setActionError(null);
+    try {
+      if (o.status === 'Pending') {
+        await markReportReceived(o.lab_test_order_id);
+        reload();
+      }
+      setResultOrderId(o.lab_test_order_id);
+    } catch (err: any) {
+      setActionError(err?.response?.data?.message || 'Could not open the results. Try again.');
+    }
+  };
   const orders = result?.data ?? [];
 
   return (
     <div>
       <div className="dash-header">
         <div>
-          <h1>My Lab Reports</h1>
-          <p>All laboratory investigations you've requested, across every patient.</p>
+          <h1>Lab Tests &amp; Results</h1>
+          <p>Every lab test you have ordered, for all patients. Press <strong>Enter results</strong> on a test to fill in its values. To order a test, open the patient's visit and use <strong>Order lab tests</strong>.</p>
         </div>
       </div>
+      {actionError && <div className="dash-error-banner" role="alert">{actionError}</div>}
 
       <div className="pat-filter-bar" style={{ marginBottom: 16 }}>
         <div className="pat-search" style={{ maxWidth: 320 }}>
@@ -111,14 +126,14 @@ const MyLabReports = () => {
                       <button className="pat-btn" style={{ fontSize: 13, padding: '4px 8px' }} onClick={() => printLabTestOrder(o.lab_test_order_id)}>
                         <PrintIcon /> Request
                       </button>
-                      {o.status === 'Pending' && (
-                        <button className="pat-btn" style={{ fontSize: 13, padding: '4px 8px' }} onClick={() => setReceiveOrder(o)}>
-                          Report Received
+                      {(o.status === 'Pending' || o.status === 'Report Received') && (
+                        <button className="pat-btn primary" style={{ fontSize: 13, padding: '4px 8px' }} onClick={() => void enterResults(o)}>
+                          <ClipboardIcon /> Enter results
                         </button>
                       )}
-                      {o.status === 'Report Received' && (
-                        <button className="pat-btn primary" style={{ fontSize: 13, padding: '4px 8px' }} onClick={() => setResultOrderId(o.lab_test_order_id)}>
-                          <ClipboardIcon /> Enter Results
+                      {o.status === 'Pending' && (
+                        <button className="pat-btn" style={{ fontSize: 13, padding: '4px 8px' }} onClick={() => setReceiveOrder(o)} title="Mark the report as back and attach the scanned report">
+                          Attach report
                         </button>
                       )}
                       {o.status === 'Completed' && (

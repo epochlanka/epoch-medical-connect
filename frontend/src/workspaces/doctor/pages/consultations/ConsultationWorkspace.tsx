@@ -18,7 +18,7 @@ import type { ConsultationInput, AmendmentEntry, AmendableField, PatientConsulta
 import { searchIcd11 } from '../../lib/icd11';
 import type { Icd11Match } from '../../lib/icd11';
 import { getClinicSettings } from '../../lib/settings';
-import { listLabTestOrders, printLabTestOrder, printLabResultReport } from '../../lib/labTestOrders';
+import { listLabTestOrders, printLabTestOrder, printLabResultReport, markReportReceived } from '../../lib/labTestOrders';
 import type { LabTestOrder } from '../../lib/labTestOrders';
 import { listActiveLetterTemplates, previewLetter, issueLetter, listIssuedLettersForPatient, printIssuedLetterAgain } from '../../lib/letters';
 import type { LetterTemplate, IssuedLetterSummary } from '../../lib/letters';
@@ -82,7 +82,7 @@ const formatTime = (iso: string) => new Date(iso).toLocaleTimeString(undefined, 
 const SUPPORT_TABS = [
   { key: 'consultation', label: 'Clinical assessment' },
   { key: 'history', label: 'Patient history' },
-  { key: 'laborders', label: 'Tests' },
+  { key: 'laborders', label: 'Lab tests' },
   { key: 'letters', label: 'Letters' },
 ] as const;
 type TabKey = 'consultation' | 'examination' | 'prescription' | 'laborders' | 'followup' | 'letters' | 'history';
@@ -472,6 +472,23 @@ const Workspace = ({ appointmentId }: { appointmentId: number }) => {
   const [addLabTestOpen, setAddLabTestOpen] = useState(false);
   const [receiveOrder, setReceiveOrder] = useState<LabTestOrder | null>(null);
   const [resultOrder, setResultOrder] = useState<LabTestOrder | null>(null);
+  const activeLabCount = labTestOrders.filter((o) => o.status !== 'Cancelled').length;
+  const labResultsWaiting = labTestOrders.filter((o) => o.status === 'Report Received').length;
+  const [labError, setLabError] = useState<string | null>(null);
+  // The patient brought the report, or it came back: record it as received and open the results
+  // table in one click, instead of "Report Received" then "Enter Results".
+  const enterLabResults = async (o: LabTestOrder) => {
+    setLabError(null);
+    try {
+      if (o.status === 'Pending') {
+        await markReportReceived(o.lab_test_order_id);
+        reloadLabTestOrders();
+      }
+      setResultOrder(o);
+    } catch (err: any) {
+      setLabError(err?.response?.data?.message || 'Could not open the results. Try again.');
+    }
+  };
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -911,6 +928,8 @@ const Workspace = ({ appointmentId }: { appointmentId: number }) => {
         {SUPPORT_TABS.map((t) => (
           <button key={t.key} className={`cons-tab${tab === t.key ? ' active' : ''}`} onClick={() => setTab(t.key)}>
             {t.label}
+            {t.key === 'laborders' && activeLabCount > 0 && <span className="cons-tab-count">{activeLabCount}</span>}
+            {t.key === 'laborders' && labResultsWaiting > 0 && <span className="cons-tab-dot" title="Results waiting to be entered" />}
           </button>
         ))}
       </div>
@@ -1217,8 +1236,17 @@ const Workspace = ({ appointmentId }: { appointmentId: number }) => {
 
           {tab === 'laborders' && (
             <div className="cons-box">
-              <div className="cons-box-title">Lab Tests for this Visit</div>
-              {labTestOrders.length === 0 && <div className="pat-empty">No lab tests ordered for this consultation yet.</div>}
+              <div className="cons-box-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <span>Lab tests for this visit</span>
+                <button className="cons-btn primary" disabled={(!consultationId && !canEdit) || saving} onClick={() => void openLabTests()}>
+                  <ClipboardIcon /> Order lab tests
+                </button>
+              </div>
+              <p className="pat-muted" style={{ fontSize: 13, margin: '0 0 10px' }}>
+                Order tests here. When the report is back, press <strong>Enter results</strong> on the test to fill in its values.
+              </p>
+              {labError && <div className="ong-error" role="alert">{labError}</div>}
+              {labTestOrders.length === 0 && <div className="pat-empty">No lab tests ordered for this visit yet.</div>}
               {labTestOrders.map((o) => (
                 <div key={o.lab_test_order_id} className="cons-rx-row" style={{ flexWrap: 'wrap', gap: 8 }}>
                   <span>
@@ -1237,14 +1265,14 @@ const Workspace = ({ appointmentId }: { appointmentId: number }) => {
                     <button className="pat-btn" style={{ fontSize: 13, padding: '5px 9px' }} onClick={() => printLabTestOrder(o.lab_test_order_id)}>
                       <PrintIcon /> Print Request
                     </button>
-                    {o.status === 'Pending' && (
-                      <button className="pat-btn" style={{ fontSize: 13, padding: '5px 9px' }} onClick={() => setReceiveOrder(o)}>
-                        Report Received
+                    {(o.status === 'Pending' || o.status === 'Report Received') && (
+                      <button className="pat-btn primary" style={{ fontSize: 13, padding: '5px 9px' }} onClick={() => void enterLabResults(o)}>
+                        <ClipboardIcon /> Enter results
                       </button>
                     )}
-                    {o.status === 'Report Received' && (
-                      <button className="pat-btn primary" style={{ fontSize: 13, padding: '5px 9px' }} onClick={() => setResultOrder(o)}>
-                        Open / Enter Results
+                    {o.status === 'Pending' && (
+                      <button className="pat-btn" style={{ fontSize: 13, padding: '5px 9px' }} onClick={() => setReceiveOrder(o)} title="Mark the report as back and attach the scanned report">
+                        Attach report
                       </button>
                     )}
                     {o.status === 'Completed' && (
@@ -1260,13 +1288,8 @@ const Workspace = ({ appointmentId }: { appointmentId: number }) => {
                   </div>
                 </div>
               ))}
-              <div style={{ marginTop: 14 }}>
-                <button className="cons-btn primary" disabled={(!consultationId && !canEdit) || saving} onClick={() => void openLabTests()}>
-                  <ClipboardIcon /> Order lab tests
-                </button>
-              </div>
-              <p className="pat-muted" style={{ fontSize: 13, marginTop: 10 }}>
-                View pending/completed results and doctor review for all of this patient's visits under Patient Search → Lab Results.
+              <p className="pat-muted" style={{ fontSize: 13, marginTop: 12 }}>
+                Every lab test and result, for all patients, is under <strong>Lab Tests &amp; Results</strong> in the menu on the left.
               </p>
             </div>
           )}
