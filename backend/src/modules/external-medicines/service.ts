@@ -30,7 +30,11 @@ export interface ExternalMedicineInput {
   quantity_unit: string;
   instructions?: string;
   is_long_term?: boolean;
+  /** YYYY-MM-DD; omitted or null = starts the day it is prescribed. */
+  start_date?: string | null;
 }
+
+const toDay = (iso: string | null | undefined) => (iso ? new Date(`${iso}T00:00:00Z`) : null);
 
 const serialize = (row: any) => ({
   extItemId: row.ext_item_id,
@@ -51,6 +55,7 @@ const serialize = (row: any) => ({
   quantityUnit: row.quantity_unit,
   instructions: row.instructions,
   isLongTerm: row.is_long_term,
+  startDate: row.start_date ? new Date(row.start_date).toISOString().slice(0, 10) : null,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -132,6 +137,7 @@ export const createExternalMedicine = async (prescriptionId: number, input: Exte
         quantity_unit: input.quantity_unit.trim(),
         instructions: input.instructions || undefined,
         is_long_term: !!input.is_long_term,
+        start_date: toDay(input.start_date),
       },
     });
     await rememberExternalMedicines(tx, [created], actor.user_id);
@@ -171,6 +177,7 @@ export const bulkCreateExternalMedicines = async (prescriptionId: number, items:
           quantity_unit: input.quantity_unit.trim(),
           instructions: input.instructions || undefined,
           is_long_term: !!input.is_long_term,
+          start_date: toDay(input.start_date),
         },
       });
       created.push(row);
@@ -260,6 +267,8 @@ export const updateExternalMedicine = async (extItemId: number, updates: Partial
       quantity_unit: merged.quantity_unit.trim(),
       instructions: merged.instructions,
       is_long_term: !!merged.is_long_term,
+      // Left out = unchanged; null clears it (starts the day it was prescribed).
+      ...(updates.start_date !== undefined ? { start_date: toDay(updates.start_date) } : {}),
     },
   });
   return serialize(row);

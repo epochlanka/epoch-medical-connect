@@ -16,6 +16,8 @@ export interface ExternalMedicineInput {
   quantity_unit: string;
   instructions?: string;
   is_long_term?: boolean;
+  /** YYYY-MM-DD; omitted = starts the day it is prescribed. */
+  start_date?: string | null;
 }
 
 export interface ExternalMedicine {
@@ -86,6 +88,7 @@ export interface SavedExternalMedicine {
   duration: string | null;
   instructions: string | null;
   isLongTerm: boolean;
+  startDate?: string | null;
   useCount: number;
   lastUsedAt: string;
 }

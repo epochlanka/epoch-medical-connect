@@ -26,6 +26,8 @@ const itemSchema = z.object({
   quantity_unit: z.string().min(1, 'Quantity unit is required'),
   instructions: z.string().optional(),
   is_long_term: z.boolean().optional(),
+  // YYYY-MM-DD; left out = starts the day it is prescribed.
+  start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Start date must be YYYY-MM-DD').nullable().optional(),
 });
 
 const prescriptionIdParams = z.object({ params: z.object({ prescriptionId: z.coerce.number().int().positive() }) });

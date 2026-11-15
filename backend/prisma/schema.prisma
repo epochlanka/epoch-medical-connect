@@ -381,6 +381,8 @@ model ExternalPrescriptionMedicine {
   quantity_unit   String
   instructions    String? // ';'-joined chips, same encoding as PrescriptionItem.instructions
   is_long_term    Boolean  @default(false) // same meaning as PrescriptionItem.is_long_term
+  // The day it starts when not the day it is prescribed (a later dose step), as on clinic lines.
+  start_date    DateTime? @db.Date
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
 

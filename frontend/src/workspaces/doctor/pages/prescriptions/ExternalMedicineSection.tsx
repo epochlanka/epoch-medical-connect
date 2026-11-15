@@ -12,6 +12,7 @@ import { doseProfile, composeDosage, amountFromDosage } from '../../lib/doseForm
 import { PlusIcon, SearchIcon, EditIcon, TrashIcon, XIcon, PillIcon, PrintIcon } from '../../components/layout/Icons';
 import './externalMedicines.css';
 import FrequencyPicker from './FrequencyPicker';
+import StartDatePicker, { dayAfterCourse, dayLabel } from './StartDatePicker';
 
 const DURATION_OPTIONS = ['3 Days', '5 Days', '7 Days', '10 Days', '14 Days', '1 Month', 'Ongoing'];
 
@@ -157,6 +158,8 @@ export interface ExternalMedicineDraft {
   instructionChips: string[];
   /** Taken long-term: stays on the ongoing-medicines list after the course runs out. */
   isLongTerm?: boolean;
+  /** YYYY-MM-DD when it starts later than today (a later dose step); '' or unset = today. */
+  startDate?: string;
   /** The dose when it is not a count of what the patient buys: drops, puffs, where a cream goes,
    *  an injection dose (see doseForms.ts). */
   doseAmount?: string;
@@ -241,6 +244,7 @@ export const draftToInput = (d: ExternalMedicineDraft): ExternalMedicineInput =>
   quantity_unit: d.quantity_unit,
   instructions: d.instructionChips.length ? d.instructionChips.join('; ') : undefined,
   is_long_term: !!d.isLongTerm,
+  start_date: d.startDate || undefined,
 });
 
 const emptyDraft = (key: string): ExternalMedicineDraft => ({
@@ -297,7 +301,7 @@ const buildExternalSlipHtml = (opts: {
         <td>${escapeHtml(extDosage(it))}</td>
         <td>${escapeHtml(Number(it.dose_qty) > 0 ? `${it.dose_qty} ${it.quantity_unit}` : '—')}</td>
         <td>${escapeHtml(it.frequency || '—')}</td>
-        <td>${escapeHtml(it.duration || '—')}</td>
+        <td>${escapeHtml(it.duration || '—')}${it.startDate ? `<br/><span class="muted">from ${escapeHtml(dayLabel(it.startDate))}</span>` : ''}</td>
         <td>${escapeHtml(`${it.quantity} ${it.quantity_unit}`)}</td>
         <td>${escapeHtml(it.instructionChips.join(', ') || '—')}</td>
       </tr>`;
@@ -363,11 +367,14 @@ const AddExternalMedicineModal = ({
   dosageForms,
   editing,
   prefill,
+  others,
   onClose,
   onSave,
 }: {
   dosageForms: string[];
   editing: ExternalMedicineDraft | null;
+  /** The other outside medicines on this prescription: the same one may go on again as a later dose step. */
+  others: ExternalMedicineDraft[];
   prefill: ShortfallPrefill | null;
   onClose: () => void;
   onSave: (draft: ExternalMedicineDraft) => void;
@@ -738,7 +745,31 @@ const AddExternalMedicineModal = ({
               </div>
             </div>
 
+            {(() => {
+              // Already on this prescription: offer to start this one when that course ends.
+              const name = draft.medicine_name.trim().toLowerCase();
+              const earlier = name ? [...others].reverse().find((o) => o.medicine_name.trim().toLowerCase() === name) : undefined;
+              if (!earlier) return null;
+              const days = parseDurationDays(earlier.duration);
+              const after = days ? dayAfterCourse(earlier.startDate ?? '', days) : null;
+              return (
+                <div className="rxp-step-hint">
+                  <span>
+                    {earlier.medicine_name} is already on this prescription{earlier.duration ? ` (${earlier.duration})` : ''}. Give this one its own dose and when it <strong>starts</strong>.
+                  </span>
+                  {after && after !== draft.startDate && (
+                    <button type="button" className="ext-qty-link" onClick={() => setDraft({ ...draft, startDate: after })}>
+                      Start when that one ends ({dayLabel(after)})
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
             <div className="ext-form-row">
+              <div className="modal-field">
+                <label>Starts</label>
+                <StartDatePicker value={draft.startDate ?? ''} onChange={(v) => setDraft({ ...draft, startDate: v })} />
+              </div>
               <div className="modal-field">
                 <label>Duration</label>
                 <input list="ext-duration-options" value={draft.duration} onChange={(e) => updateSchedule('duration', e.target.value)} placeholder="6 Days" />
@@ -939,6 +970,7 @@ const ExternalMedicineSection = ({
         <ol className="ext-list">
           {items.map((it) => {
             const how = [
+              it.startDate ? `From ${dayLabel(it.startDate)}` : '',
               extDosage(it),
               it.frequency,
               it.duration,
@@ -983,6 +1015,7 @@ const ExternalMedicineSection = ({
           dosageForms={dosageForms}
           editing={editing}
           prefill={editing ? null : prefillRequest}
+          others={items.filter((x) => x.key !== editing?.key)}
           onClose={closeModal}
           onSave={handleSave}
         />

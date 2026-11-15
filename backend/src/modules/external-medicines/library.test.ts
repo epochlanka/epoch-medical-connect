@@ -155,4 +155,22 @@ describe('Saved outside medicines', () => {
     expect([...counts].sort((a, b) => b - a)).toEqual(counts);
     expect((await request(app).delete('/api/v1/external-medicines/library/999999999').set('Authorization', `Bearer ${doctorToken}`)).status).toBe(404);
   });
+  it('keeps a start date on an outside line, changes and clears it', async () => {
+    const rx = await prescriptionFor();
+    const res = await request(app)
+      .post(`/api/v1/external-medicines/prescription/${rx}/bulk`)
+      .set('Authorization', `Bearer ${doctorToken}`)
+      .send({ items: [line({ dose_qty: 2, duration: '7 Days' }), line({ dose_qty: 1, duration: '14 Days', start_date: '2026-11-22' })] });
+    expect(res.status).toBe(201);
+    expect(res.body.map((r: any) => r.startDate)).toEqual([null, '2026-11-22']);
+    const id = res.body[1].extItemId;
+    const moved = await request(app).put(`/api/v1/external-medicines/${id}`).set('Authorization', `Bearer ${doctorToken}`).send({ start_date: '2026-11-23' });
+    expect(moved.body.startDate).toBe('2026-11-23');
+    const same = await request(app).put(`/api/v1/external-medicines/${id}`).set('Authorization', `Bearer ${doctorToken}`).send({ frequency: 'BD' });
+    expect(same.body.startDate).toBe('2026-11-23');
+    const cleared = await request(app).put(`/api/v1/external-medicines/${id}`).set('Authorization', `Bearer ${doctorToken}`).send({ start_date: null });
+    expect(cleared.body.startDate).toBeNull();
+    const bad = await request(app).post(`/api/v1/external-medicines/prescription/${rx}`).set('Authorization', `Bearer ${doctorToken}`).send(line({ start_date: 'next week' }));
+    expect(bad.status).toBe(400);
+  });
 });

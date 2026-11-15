@@ -1,3 +1,4 @@
+import { startText } from '../prescriptions/doseText';
 import PDFDocument from 'pdfkit';
 import { Response } from 'express';
 import fs from 'fs';
@@ -59,7 +60,7 @@ export const streamExternalMedicineSlipPdf = (prescription: any, clinicSettings:
     // "Take 1.5 tablets" is the instruction the outside pharmacy and the patient actually need;
     // without it the slip only said how many to buy, not how many to take.
     const take = item.dose_qty ? `Take ${item.dose_qty} ${item.quantity_unit}` : null;
-    const line2 = [item.dosage, take, item.frequency, item.duration].filter(Boolean).join(' — ');
+    const line2 = [startText(item.start_date), item.dosage, take, item.frequency, item.duration].filter(Boolean).join(' — ');
     if (line2) doc.text(line2, { indent: 14 });
     doc.text(`Qty: ${item.quantity} ${item.quantity_unit}`, { indent: 14 });
     if (item.instructions) doc.text(item.instructions.split(';').map((s: string) => s.trim()).join(', '), { indent: 14 });
