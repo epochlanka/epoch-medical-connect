@@ -560,6 +560,7 @@ export const getPatientConsultationHistory = async (patientId: string, excludeAp
           route: i.route,
           instructions: i.instructions,
           qty: i.qty,
+          startDate: i.start_date,
         })),
         // Bought outside the clinic — part of the patient's treatment, just not dispensed here.
         externalMedicines: rx.external_medicines.map((e) => ({

@@ -25,12 +25,22 @@ interface DoseItem {
   duration?: string | null;
   route?: string | null;
   instructions?: string | null;
+  start_date?: Date | string | null;
 }
+
+/** "From 22 Nov 2026" for a line that does not start the day it was prescribed. */
+export const startText = (start: Date | string | null | undefined): string | null => {
+  if (!start) return null;
+  const d = new Date(start);
+  if (Number.isNaN(d.getTime())) return null;
+  return `From ${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}`;
+};
 
 /** The instruction parts in reading order, starting with the dose per time when it is known. */
 export const howToTakeParts = (item: DoseItem, baseUnit: string | null | undefined, { withInstructions = true } = {}): string[] => {
   const dose = doseAmount(item.dose_qty, baseUnit);
   return [
+    startText(item.start_date),
     dose ? `Take ${dose} each time` : null,
     item.dosage,
     item.frequency,

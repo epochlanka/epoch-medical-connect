@@ -15,6 +15,8 @@ export interface PrescriptionItemInput {
   external_qty?: number;
   /** Taken long-term: stays on the ongoing-medicines list after the course runs out. */
   is_long_term?: boolean;
+  /** YYYY-MM-DD; omitted = starts the day it is prescribed. */
+  start_date?: string;
 }
 
 /** 'External' = every medicine is bought outside; it never enters the pharmacy queue. */

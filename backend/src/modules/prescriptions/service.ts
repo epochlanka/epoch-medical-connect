@@ -34,6 +34,7 @@ interface PrescriptionItemInput {
   qty_manual?: boolean;
   external_qty?: number;
   is_long_term?: boolean;
+  start_date?: string;
 }
 
 interface CreatePrescriptionInput {
@@ -198,6 +199,7 @@ export const createPrescription = async (input: CreatePrescriptionInput, actor: 
             qty_manual: !!i.qty_manual,
             external_qty: i.external_qty ?? 0,
             is_long_term: !!i.is_long_term,
+            start_date: i.start_date ? new Date(`${i.start_date}T00:00:00Z`) : null,
           })),
         },
       },

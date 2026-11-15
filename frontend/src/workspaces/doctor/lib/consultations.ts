@@ -127,6 +127,8 @@ export interface PatientHistoryMedicine {
   route?: string | null;
   instructions: string | null;
   qty: number;
+  /** Clinic lines that start later than the visit (a later dose step). */
+  startDate?: string | null;
 }
 
 export interface PatientHistoryLabResult {

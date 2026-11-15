@@ -41,6 +41,8 @@ export interface OngoingMedication {
   /** The doctor ticked "Long-term" on the latest line. */
   markedLongTerm: boolean;
   issuedAt: Date;
+  /** The day the course starts, when the doctor set one later than the prescription date. */
+  startsAt: Date | null;
   /** End of the latest course, or null for an open-ended one. */
   endsAt: Date | null;
   /** Whole days of supply left (negative once it ran out); null when open-ended. */
@@ -106,8 +108,10 @@ export const getOngoingMedications = async (patientId: string, opts: { excludeCo
       orderBy: [{ issued_at: 'desc' }, { prescription_id: 'desc' }],
       include: {
         items: {
-          orderBy: { rx_item_id: 'asc' },
+          // A later-starting line for the same medicine (the next dose step) is its latest course.
+          orderBy: [{ start_date: { sort: 'desc', nulls: 'last' } }, { rx_item_id: 'asc' }],
           select: {
+            start_date: true,
             medicine_id: true,
             dosage: true,
             dose_qty: true,
@@ -146,7 +150,7 @@ export const getOngoingMedications = async (patientId: string, opts: { excludeCo
     const stop = stoppedAt.get(key);
     if (stop && stop >= line.issuedAt) return;
     const longTerm = line.markedLongTerm || (!!line.duration && OPEN_ENDED.test(line.duration));
-    const { status, endsAt } = classify(line.issuedAt, line.duration, longTerm, now);
+    const { status, endsAt } = classify(line.startsAt ?? line.issuedAt, line.duration, longTerm, now);
     if (!status) return;
     const daysLeft = endsAt ? Math.ceil((endsAt.getTime() - now.getTime()) / DAY_MS) : null;
     medicines.push({ ...line, key, status, longTerm, endsAt, daysLeft });
@@ -160,6 +164,7 @@ export const getOngoingMedications = async (patientId: string, opts: { excludeCo
         outside: false,
         markedLongTerm: i.is_long_term,
         issuedAt: rx.issued_at,
+        startsAt: i.start_date,
         prescriptionId: rx.prescription_id,
         consultationId: rx.consultation_id,
         lastDispensedAt: i.dispensed_at,
@@ -184,6 +189,7 @@ export const getOngoingMedications = async (patientId: string, opts: { excludeCo
         outside: true,
         markedLongTerm: e.is_long_term,
         issuedAt: rx.issued_at,
+        startsAt: null,
         prescriptionId: rx.prescription_id,
         consultationId: rx.consultation_id,
         lastDispensedAt: null,

@@ -66,6 +66,8 @@ export interface PrescriptionItemDetail {
   duration: string | null;
   route: string | null;
   instructions: string | null;
+  /** The day this line starts when not the day it was prescribed (a later dose step). */
+  start_date?: string | null;
   qty: number;
   external_qty: number;
   dispensed_qty: number; // cumulative qty drawn from clinic stock across partial dispenses (excludes external_qty)
@@ -95,7 +97,8 @@ export const scheduleParts = (item: Pick<PrescriptionItemDetail, 'dosage' | 'fre
 /** Everything about taking it, dose first — matches the printed label (backend doseText.ts). */
 export const howToTake = (item: PrescriptionItemDetail) => {
   const dose = doseAmount(item.dose_qty, item.medicine.base_unit);
-  return [dose ? `Take ${dose} each time` : null, ...scheduleParts(item)].filter(Boolean).join(' · ');
+  const from = item.start_date ? `From ${new Date(item.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}` : null;
+  return [from, dose ? `Take ${dose} each time` : null, ...scheduleParts(item)].filter(Boolean).join(' · ');
 };
 
 export interface PrescriptionDetail {

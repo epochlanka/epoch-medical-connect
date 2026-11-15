@@ -187,4 +187,36 @@ describe('Ongoing medicines', () => {
     const res = await request(app).post('/api/v1/prescriptions/medication-stops').set('Authorization', `Bearer ${doctorToken}`).send({ patient_id: 'PT-NOPE', medicine_name: 'X' });
     expect(res.status).toBe(404);
   });
+  it('takes the same medicine twice at different doses, the second line starting later', async () => {
+    const pid = await makePatient(`STEP${Math.random().toString(36).slice(2, 6)}`);
+    const appointment = await prisma.appointment.create({ data: { patient_id: pid, doctor_id: doctorId, created_by: receptionId, scheduled_at: new Date(), status: 'Consulting' } });
+    const consult = await request(app).post('/api/v1/consultations').set('Authorization', `Bearer ${doctorToken}`).send({ appointment_id: appointment.appointment_id, complaint: 'Taper' });
+    const rx = await request(app)
+      .post('/api/v1/prescriptions')
+      .set('Authorization', `Bearer ${doctorToken}`)
+      .send({
+        consultation_id: consult.body.consultation_id,
+        items: [
+          { medicine_id: meds.Paracetamol, dosage: '500 mg', dose_qty: 2, frequency: 'OD - Once Daily', duration: '7 Days', qty: 14 },
+          { medicine_id: meds.Paracetamol, dosage: '500 mg', dose_qty: 1, frequency: 'OD - Once Daily', duration: '14 Days', qty: 14, start_date: '2026-11-20' },
+        ],
+      });
+    expect(rx.status).toBe(201);
+    expect(rx.body.items).toHaveLength(2);
+    expect(rx.body.items.map((i: any) => i.start_date && i.start_date.slice(0, 10))).toEqual([null, '2026-11-20']);
+
+    const bad = await request(app)
+      .post('/api/v1/prescriptions')
+      .set('Authorization', `Bearer ${doctorToken}`)
+      .send({ consultation_id: consult.body.consultation_id, items: [{ medicine_id: meds.Paracetamol, dosage: '500 mg', dose_qty: 1, frequency: 'OD', duration: '7 Days', qty: 7, start_date: '20/11/2026' }] });
+    expect(bad.status).toBe(400);
+
+    // On the ongoing list, the later step is the course that counts: it runs to 4 Dec.
+    await prisma.prescription.update({ where: { prescription_id: rx.body.prescription_id }, data: { issued_at: new Date('2026-11-13T08:00:00Z') } });
+    const list = await getOngoingMedications(pid, { now: new Date('2026-11-25T09:00:00Z') });
+    const para = byName(list.medicines, 'Paracetamol') as any;
+    expect(para.doseQty).toBe(1);
+    expect(para.status).toBe('running');
+    expect(para.endsAt.toISOString().slice(0, 10)).toBe('2026-12-04');
+  });
 });

@@ -40,6 +40,7 @@ import '../queue/queue.css';
 import '../consultations/consultation.css';
 import './prescriptions.css';
 import FrequencyPicker from './FrequencyPicker';
+import StartDatePicker, { dayAfterCourse, dayLabel } from './StartDatePicker';
 
 const initials = (name: string) =>
   name
@@ -157,7 +158,7 @@ const scheduledDoseCount = (frequency?: string, duration?: string): number | nul
 // (1.5 tablets x TDS x 5 days = 22.5 -> 23).
 /** "1 tablet · TDS · 5 Days · Oral · After food" for the final check. */
 const draftHowToTake = (it: DraftItem) =>
-  [lineDosage(it), it.frequency, it.duration, it.route, it.instructionChips.join(', ')].filter(Boolean).join(' · ');
+  [it.startDate ? `From ${dayLabel(it.startDate)}` : '', lineDosage(it), it.frequency, it.duration, it.route, it.instructionChips.join(', ')].filter(Boolean).join(' · ');
 
 const computeExpectedQty = (frequency?: string, duration?: string, dose?: string | number): number | null => {
   const doses = scheduledDoseCount(frequency, duration);
@@ -214,6 +215,8 @@ interface DraftItem {
   /** The doctor typed the dosage text under "More options"; it is no longer written for them. */
   dosageManual?: boolean;
   showMore?: boolean;
+  /** YYYY-MM-DD when this line starts later than today (a later dose step); '' or unset = today. */
+  startDate?: string;
 }
 
 const lineProfile = (it: Pick<DraftItem, 'form' | 'unit'>): DoseProfile => doseProfile(it.form, it.unit);
@@ -606,16 +609,15 @@ const Builder = ({ consultationId }: { consultationId: number }) => {
     }
   };
 
+  // The same medicine may go on twice — a dose change part-way ("2 a day this week, then 1 a day"):
+  // the second line gets its own dose, length and start date.
   const addMedicine = (m: Medicine) => {
-    if (items.some((i) => i.medicine_id === m.medicine_id)) {
-      setSearchOpen(false);
-      setSearchTerm('');
-      return;
-    }
+    const key = `${m.medicine_id}-${Date.now()}`;
+    if (items.some((i) => i.medicine_id === m.medicine_id)) setHighlightKey(key);
     setItems((prev) => [
       ...prev,
       shapeLine({
-        key: `${m.medicine_id}-${Date.now()}`,
+        key,
         medicine_id: m.medicine_id,
         name: m.name,
         generic_name: m.generic_name,
@@ -717,6 +719,7 @@ const Builder = ({ consultationId }: { consultationId: number }) => {
       qty_manual: i.qtyManual || !lineProfile(i).counted || scheduledDoseCount(i.frequency, i.duration) === null,
       external_qty: 0,
       is_long_term: !!i.isLongTerm,
+      start_date: i.startDate || undefined,
     }));
 
   // Live allergy check — same substring match the backend runs authoritatively at submit time;
@@ -1086,6 +1089,26 @@ const Builder = ({ consultationId }: { consultationId: number }) => {
                         </button>
                       </div>
 
+                      {(() => {
+                        // The same medicine on an earlier line: offer to start this one when that course ends.
+                        const prevIndex = items.slice(0, i).map((x) => x.medicine_id).lastIndexOf(it.medicine_id);
+                        if (prevIndex < 0) return null;
+                        const prev = items[prevIndex];
+                        const days = parseDurationDays(prev.duration);
+                        const after = days ? dayAfterCourse(prev.startDate ?? '', days) : null;
+                        return (
+                          <div className="rxp-step-hint">
+                            <span>
+                              Also on line {prevIndex + 1}. Set this line's own dose and when it <strong>starts</strong>.
+                            </span>
+                            {after && after !== it.startDate && (
+                              <button type="button" className="rxp-qty-link" onClick={() => patchItem(it.key, { startDate: after })}>
+                                Start when line {prevIndex + 1} ends ({dayLabel(after)})
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })()}
                       <div className="rxp-item-fields">
                         {prof.counted ? (
                           <label className="rxp-item-field" title="How many the patient takes each time — the quantity is calculated from this">
@@ -1149,6 +1172,10 @@ const Builder = ({ consultationId }: { consultationId: number }) => {
                               </option>
                             ))}
                           </select>
+                        </label>
+                        <label className="rxp-item-field" title="When the patient starts this one. Leave as Today unless it follows on from another line.">
+                          <span>Starts</span>
+                          <StartDatePicker className="rxb-table-input" value={it.startDate ?? ''} onChange={(v) => patchItem(it.key, { startDate: v })} />
                         </label>
                         <div className="rxp-item-field">
                           <span>Quantity</span>

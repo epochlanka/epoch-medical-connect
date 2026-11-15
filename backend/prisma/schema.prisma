@@ -263,6 +263,9 @@ model PrescriptionItem {
   // Taken long-term (e.g. a monthly antihypertensive): stays on the patient's ongoing-medicines list
   // after its course runs out, until a doctor stops it. See currentMedications.ts.
   is_long_term            Boolean   @default(false)
+  // The day this line starts, when not the day it is prescribed: a second line for the same
+  // medicine can carry on at a new dose ("2 a day for a week, then 1 a day from next week").
+  start_date              DateTime? @db.Date
   qty                     Int
   external_qty            Int       @default(0) // portion of qty sourced externally — 0 = fully clinic, qty = fully external, else split
   dispensed_qty           Int       @default(0) // cumulative qty drawn from clinic stock across partial dispenses; item is complete once dispensed_qty + external_qty >= qty

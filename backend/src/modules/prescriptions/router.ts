@@ -27,6 +27,8 @@ const itemSchema = z.object({
   external_qty: z.number().int().min(0).optional(),
   // Taken long-term: stays on the ongoing-medicines list after the course runs out.
   is_long_term: z.boolean().optional(),
+  // YYYY-MM-DD; left out = starts the day it is prescribed.
+  start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Start date must be YYYY-MM-DD').optional(),
 });
 
 const createSchema = z.object({

@@ -20,7 +20,9 @@ const daysAgo = (iso: string) => {
 
 /** "Take 1 Tablet each time · 500 mg · TDS · 5 Days" */
 export const howToTake = (m: PatientHistoryMedicine) =>
-  [m.doseQty ? `Take ${m.doseQty} ${m.unit ?? ''} each time`.replace(/\s+each/, ' each') : null, m.dosage, m.frequency, m.duration, m.route]
+  [
+    m.startDate ? `From ${new Date(m.startDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}` : null,
+    m.doseQty ? `Take ${m.doseQty} ${m.unit ?? ''} each time`.replace(/\s+each/, ' each') : null, m.dosage, m.frequency, m.duration, m.route]
     .filter(Boolean)
     .join(' · ');
 
