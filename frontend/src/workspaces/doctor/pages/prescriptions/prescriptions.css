@@ -560,7 +560,7 @@
 .rxp-item-head .rxp-source-block { margin: 0; padding: 0; border: 0; align-items: flex-end; text-align: right; }
 .rxp-item-fields {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
   align-items: start;
 }
@@ -652,3 +652,14 @@
   .ong-row { flex-wrap: wrap; }
   .ong-actions { width: 100%; justify-content: flex-start; }
 }
+
+/* Form-aware lines (doseForms.ts): strength beside the name, a wider box for text doses ("affected
+   area", "1 g"), and the "More options" row with a preview of what the label will say. */
+.rxp-strength { font-weight: 500; color: var(--ink-muted); }
+.rxp-item-field .rxp-dose-row input[inputmode='text'] { width: 100%; flex-shrink: 1; }
+.rxp-item-field select.rxb-table-input { width: 100%; background: #fff; }
+.rxp-item-more { display: flex; align-items: center; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
+.rxp-item-more .rxp-qty-link { margin: 0; }
+.rxp-label-preview { font-size: 13px; color: var(--ink-muted); }
+.rxp-item-fields-more { margin-top: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.rxp-qty-note.hint { color: var(--ink-soft); }

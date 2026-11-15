@@ -1080,3 +1080,35 @@ model MedicationStop {
 
   @@index([patient_id, medicine_key])
 }
+
+// The clinic's shared list of medicines doctors have typed in to buy outside (not in the clinic
+// catalogue), so the next doctor can pick one from the outside-medicine search instead of retyping
+// it. One row per name (name_key = lower-cased, trimmed name). Kept up to date whenever a
+// prescription with manually typed outside medicines is saved: the details and the dosing are those
+// of the latest use, offered as editable defaults. "Remove from list" only hides the suggestion
+// (hidden = true); prescribing the same name again brings it back. Past prescriptions are never
+// changed by anything here.
+model ExternalMedicineLibrary {
+  library_id    Int      @id @default(autoincrement())
+  name_key      String   @unique
+  medicine_name String
+  generic_name  String?
+  brand_name    String?
+  dosage_form   String
+  strength      String?
+  quantity_unit String
+  dosage        String?
+  dose_qty      Float?
+  frequency     String?
+  duration      String?
+  instructions  String?
+  is_long_term  Boolean  @default(false)
+  use_count     Int      @default(1)
+  last_used_at  DateTime @default(now())
+  last_used_by  Int?
+  hidden        Boolean  @default(false)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@index([hidden, use_count])
+}

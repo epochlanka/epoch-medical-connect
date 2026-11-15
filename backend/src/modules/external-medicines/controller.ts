@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import * as service from './service';
+import * as library from './library';
 import { streamExternalMedicineSlipPdf } from './pdf';
 import { NotFoundError, ValidationError, ForbiddenError } from './errors';
 import { respondWithServerError } from '../../errors';
@@ -79,6 +80,24 @@ export const getSlip = async (req: Request, res: Response) => {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="RX${String(prescription.prescription_id).padStart(6, '0')}-external-medicine-slip.pdf"`);
     streamExternalMedicineSlipPdf(prescription, clinicSettings, res);
+  } catch (error) {
+    handleError(req, res, error);
+  }
+};
+
+export const searchLibrary = async (req: Request, res: Response) => {
+  try {
+    const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+    res.status(200).json(await library.searchLibrary(search));
+  } catch (error) {
+    handleError(req, res, error);
+  }
+};
+
+export const hideLibraryEntry = async (req: Request, res: Response) => {
+  try {
+    await library.hideLibraryEntry(Number(req.params.libraryId), actor(req).user_id);
+    res.status(204).send();
   } catch (error) {
     handleError(req, res, error);
   }

@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { searchMedicines } from '../../lib/medicines';
 import type { Medicine } from '../../lib/medicines';
-import type { ExternalMedicineInput } from '../../lib/externalMedicines';
+import { searchSavedExternalMedicines, removeSavedExternalMedicine } from '../../lib/externalMedicines';
+import type { ExternalMedicineInput, SavedExternalMedicine } from '../../lib/externalMedicines';
 import { listMasterData, getClinicSettings } from '../../lib/settings';
 import type { ClinicSettings } from '../../lib/settings';
 import { fileUrl } from '../../lib/api';
 import { calculateAge } from '../../lib/queue';
 import InstructionsPicker from '../../components/InstructionsPicker';
+import { doseProfile, composeDosage, amountFromDosage } from '../../lib/doseForms';
 import { PlusIcon, SearchIcon, EditIcon, TrashIcon, XIcon, PillIcon, PrintIcon } from '../../components/layout/Icons';
 import './externalMedicines.css';
 
@@ -155,7 +157,25 @@ export interface ExternalMedicineDraft {
   instructionChips: string[];
   /** Taken long-term: stays on the ongoing-medicines list after the course runs out. */
   isLongTerm?: boolean;
+  /** The dose when it is not a count of what the patient buys: drops, puffs, where a cream goes,
+   *  an injection dose (see doseForms.ts). */
+  doseAmount?: string;
+  /** Which eye/ear for drops; added to the dosage text. */
+  site?: string;
+  /** The doctor typed the dosage text under "More options"; it is no longer written for them. */
+  dosageManual?: boolean;
 }
+
+const extProfile = (d: Pick<ExternalMedicineDraft, 'dosage_form' | 'quantity_unit'>) => doseProfile(d.dosage_form, d.quantity_unit);
+
+/** The dosage text saved and printed on the slip: written from the dose unless typed by hand. */
+export const extDosage = (d: ExternalMedicineDraft) => {
+  if (d.dosageManual) return d.dosage.trim() || 'As directed';
+  const p = extProfile(d);
+  const amount = d.doseAmount ?? amountFromDosage(p, d.dosage);
+  const base = composeDosage(p, d.dose_qty, amount, p.counted ? null : d.dosage);
+  return p.kind === 'drops' && d.site?.trim() ? `${base} · ${d.site.trim()}` : base;
+};
 
 // Passed down when the doctor clicks "Add to External Medicines" on a clinic item that's
 // out-of-stock/short — pre-fills the Add flow so the doctor never re-types what's already known.
@@ -188,11 +208,16 @@ const DEFAULT_UNIT_BY_FORM: Record<string, string> = {
   ointment: 'tube',
   gel: 'tube',
   inhaler: 'inhaler',
+  spray: 'bottle',
   injection: 'vials',
   sachet: 'sachets',
   lotion: 'bottle',
 };
-const defaultUnitFor = (form: string) => DEFAULT_UNIT_BY_FORM[form.trim().toLowerCase()] ?? '';
+// "Eye Drops", "Ear Drops", "Nasal Spray"...: match the last word too, not only the exact form.
+const defaultUnitFor = (form: string) => {
+  const f = form.trim().toLowerCase();
+  return DEFAULT_UNIT_BY_FORM[f] ?? DEFAULT_UNIT_BY_FORM[f.split(/\s+/).pop() ?? ''] ?? '';
+};
 const withFormDefaults = (draft: ExternalMedicineDraft, form: string): ExternalMedicineDraft => ({
   ...draft,
   dosage_form: form,
@@ -208,8 +233,8 @@ export const draftToInput = (d: ExternalMedicineDraft): ExternalMedicineInput =>
   brand_name: d.brand_name || undefined,
   dosage_form: d.dosage_form,
   strength: d.strength || undefined,
-  dosage: d.dosage,
-  dose_qty: Number(d.dose_qty) > 0 ? Number(d.dose_qty) : undefined,
+  dosage: extDosage(d),
+  dose_qty: extProfile(d).counted && Number(d.dose_qty) > 0 ? Number(d.dose_qty) : undefined,
   frequency: d.frequency || undefined,
   duration: d.duration || undefined,
   quantity: Number(d.quantity) || 1,
@@ -269,7 +294,7 @@ const buildExternalSlipHtml = (opts: {
         <td><strong>${escapeHtml(it.medicine_name)}</strong>${generic ? `<br/><span class="muted">${escapeHtml(generic)}</span>` : ''}</td>
         <td>${escapeHtml(it.dosage_form || '—')}</td>
         <td>${escapeHtml(it.strength || '—')}</td>
-        <td>${escapeHtml(it.dosage || '—')}</td>
+        <td>${escapeHtml(extDosage(it))}</td>
         <td>${escapeHtml(Number(it.dose_qty) > 0 ? `${it.dose_qty} ${it.quantity_unit}` : '—')}</td>
         <td>${escapeHtml(it.frequency || '—')}</td>
         <td>${escapeHtml(it.duration || '—')}</td>
@@ -375,6 +400,29 @@ const AddExternalMedicineModal = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [catalogResults, setCatalogResults] = useState<Medicine[]>([]);
   const [searching, setSearching] = useState(false);
+  // The clinic's saved outside medicines: the most used ones before anything is typed, then the
+  // matches. A failed lookup just shows none — the catalogue and manual entry still work.
+  const [savedResults, setSavedResults] = useState<SavedExternalMedicine[]>([]);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (step !== 'search') return;
+    const term = searchTerm.trim();
+    if (term.length === 1) return;
+    let cancelled = false;
+    const t = setTimeout(
+      () => {
+        searchSavedExternalMedicines(term)
+          .then((rows) => !cancelled && setSavedResults(rows))
+          .catch(() => !cancelled && setSavedResults([]));
+      },
+      term ? 300 : 0,
+    );
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [searchTerm, step]);
 
   useEffect(() => {
     if (searchTerm.trim().length < 2) {
@@ -389,6 +437,43 @@ const AddExternalMedicineModal = ({
     }, 300);
     return () => clearTimeout(t);
   }, [searchTerm]);
+
+  // Fills everything in from the last time it was prescribed; the doctor can change any of it.
+  const pickSaved = (m: SavedExternalMedicine) => {
+    const next: ExternalMedicineDraft = {
+      key: `ext-${Date.now()}`,
+      medicine_name: m.medicineName,
+      generic_name: m.genericName || '',
+      brand_name: m.brandName || '',
+      dosage_form: m.dosageForm || '',
+      strength: m.strength || '',
+      dosage: m.dosage || m.strength || '',
+      dose_qty: m.doseQty ? String(m.doseQty) : '1',
+      frequency: m.frequency || '',
+      duration: m.duration || '',
+      quantity: '1',
+      qtyManual: false,
+      quantity_unit: m.quantityUnit || defaultUnitFor(m.dosageForm || ''),
+      instructionChips: (m.instructions || '').split(';').map((c) => c.trim()).filter(Boolean),
+      isLongTerm: m.isLongTerm,
+    };
+    const expected = computeExpectedQty(next.frequency, next.duration, next.dose_qty);
+    setDraft(expected !== null ? { ...next, quantity: String(expected) } : next);
+    setStep('details');
+  };
+
+  const removeSaved = async (m: SavedExternalMedicine) => {
+    setRemoveError(null);
+    try {
+      await removeSavedExternalMedicine(m.libraryId);
+      setSavedResults((prev) => prev.filter((x) => x.libraryId !== m.libraryId));
+    } catch {
+      setRemoveError(`Could not remove ${m.medicineName} from the list. Try again.`);
+    }
+  };
+
+  const savedLine = (m: SavedExternalMedicine) =>
+    [m.dosage, m.frequency, m.duration].filter(Boolean).join(' · ');
 
   const pickCatalog = (m: Medicine) => {
     setDraft({
@@ -426,7 +511,9 @@ const AddExternalMedicineModal = ({
     });
   };
 
-  const calculatedQty = computeExpectedQty(draft.frequency, draft.duration, draft.dose_qty);
+  const prof = extProfile(draft);
+  const [showMore, setShowMore] = useState(false);
+  const calculatedQty = prof.counted ? computeExpectedQty(draft.frequency, draft.duration, draft.dose_qty) : null;
   const expectedQty = draft.qtyManual ? null : calculatedQty;
   const setQtyManual = (manual: boolean) =>
     setDraft((prev) => {
@@ -435,7 +522,7 @@ const AddExternalMedicineModal = ({
       return { ...prev, qtyManual: false, quantity: expected !== null ? String(expected) : prev.quantity };
     });
   const qtyNote = explainQty(draft.frequency, draft.duration, draft.dose_qty, draft.quantity_unit, draft.quantity);
-  const canSave = draft.medicine_name.trim() && draft.dosage_form.trim() && draft.dosage.trim() && isValidUnit(draft.quantity_unit) && (Number(draft.quantity) || 0) > 0;
+  const canSave = draft.medicine_name.trim() && draft.dosage_form.trim() && isValidUnit(draft.quantity_unit) && (Number(draft.quantity) || 0) > 0;
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -456,6 +543,40 @@ const AddExternalMedicineModal = ({
             <button type="button" className="ext-manual-link" onClick={startManual}>
               <PlusIcon /> Add New External Item
             </button>
+
+            {removeError && <div className="ext-qty-note blocked" role="alert">{removeError}</div>}
+
+            {savedResults.length > 0 && searchTerm.trim().length !== 1 && (
+              <div className="ext-results ext-saved-results">
+                <div className="ext-results-heading">{searchTerm.trim() ? 'Saved outside medicines' : 'Frequently prescribed outside'}</div>
+                {savedResults.map((m) => (
+                  <div className="ext-result-card ext-saved-card" key={m.libraryId} role="button" tabIndex={0} onClick={() => pickSaved(m)} onKeyDown={(e) => e.key === 'Enter' && pickSaved(m)}>
+                    <div className="ext-saved-main">
+                      <div className="ext-result-title">
+                        {m.medicineName} {m.strength ? `(${m.strength})` : ''}
+                      </div>
+                      <div className="ext-result-meta">
+                        {[m.genericName, m.brandName].filter(Boolean).join(' · ') || 'No generic name'} · {m.dosageForm}
+                      </div>
+                      {savedLine(m) && <div className="ext-result-meta">Last time: {savedLine(m)}</div>}
+                    </div>
+                    <span className="ext-saved-uses">Used {m.useCount}×</span>
+                    <button
+                      type="button"
+                      className="pat-icon-btn ext-saved-remove"
+                      title="Remove from the saved list (past prescriptions are not changed)"
+                      aria-label={`Remove ${m.medicineName} from the saved list`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void removeSaved(m);
+                      }}
+                    >
+                      <XIcon />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {searchTerm.trim().length >= 2 && (
               <div className="ext-results">
@@ -478,7 +599,7 @@ const AddExternalMedicineModal = ({
                     ))}
                   </>
                 )}
-                {!searching && catalogResults.length === 0 && (
+                {!searching && catalogResults.length === 0 && savedResults.length === 0 && (
                   <div className="ext-results-empty">No matches — try "+ Add New External Item" to enter it manually.</div>
                 )}
               </div>
@@ -540,8 +661,13 @@ const AddExternalMedicineModal = ({
                 <div className="ext-selected-name">{draft.medicine_name}</div>
                 <div className="ext-selected-meta">{[draft.generic_name, draft.brand_name].filter(Boolean).join(' · ') || 'Manual entry'}</div>
               </div>
+              {!draft.medicine_id && (
+                <button type="button" className="pat-btn" style={{ fontSize: 13, padding: '5px 9px', marginLeft: 'auto' }} onClick={() => setStep('manual')}>
+                  Edit name
+                </button>
+              )}
               {!editing && (
-                <button type="button" className="pat-btn" style={{ fontSize: 13, padding: '5px 9px', marginLeft: 'auto' }} onClick={() => setStep('search')}>
+                <button type="button" className="pat-btn" style={{ fontSize: 13, padding: '5px 9px', marginLeft: draft.medicine_id ? 'auto' : undefined }} onClick={() => setStep('search')}>
                   Change
                 </button>
               )}
@@ -559,29 +685,54 @@ const AddExternalMedicineModal = ({
               </div>
               <div className="modal-field">
                 <label>Strength</label>
-                <input value={draft.strength} onChange={(e) => setDraft({ ...draft, strength: e.target.value })} placeholder="e.g. 500mg" />
+                <input value={draft.strength} onChange={(e) => setDraft({ ...draft, strength: e.target.value })} placeholder={prof.strengthExample} />
               </div>
             </div>
 
             <div className="ext-form-row">
-              <div className="modal-field">
-                <label>Dosage</label>
-                <input value={draft.dosage} onChange={(e) => setDraft({ ...draft, dosage: e.target.value })} placeholder="e.g. 250 mg" />
-              </div>
-              <div className="modal-field">
-                <label>Take (per dose)</label>
-                <div className="ext-take-row">
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={draft.dose_qty}
-                    onChange={(e) => updateSchedule('dose_qty', e.target.value)}
-                    placeholder="1"
-                    aria-label={`${draft.quantity_unit || 'units'} per dose`}
-                  />
-                  <span>{(draft.quantity_unit || 'units').toLowerCase()} / dose</span>
+              {prof.counted ? (
+                <div className="modal-field">
+                  <label>{prof.doseLabel}</label>
+                  <div className="ext-take-row">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={draft.dose_qty}
+                      onChange={(e) => updateSchedule('dose_qty', e.target.value)}
+                      placeholder="1"
+                      aria-label={`${prof.doseUnit(2)} per dose`}
+                    />
+                    <span>{prof.doseUnit(Number(draft.dose_qty) || 1)}</span>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="modal-field">
+                  <label>{prof.doseLabel}</label>
+                  <div className="ext-take-row">
+                    <input
+                      type="text"
+                      inputMode={prof.amountKind === 'number' ? 'decimal' : 'text'}
+                      className={prof.amountKind === 'text' ? 'ext-amount-text' : undefined}
+                      value={draft.doseAmount ?? amountFromDosage(prof, draft.dosage)}
+                      onChange={(e) => setDraft({ ...draft, doseAmount: e.target.value })}
+                      placeholder={prof.amountPlaceholder}
+                      aria-label={prof.doseLabel}
+                    />
+                    {prof.amountKind === 'number' && <span>{prof.doseUnit(Number(draft.doseAmount) || 2)}</span>}
+                  </div>
+                </div>
+              )}
+              {prof.kind === 'drops' && (
+                <div className="modal-field">
+                  <label>Where</label>
+                  <select value={draft.site ?? ''} onChange={(e) => setDraft({ ...draft, site: e.target.value })}>
+                    <option value="">—</option>
+                    {prof.routeOptions.map((r) => (
+                      <option key={r}>{r}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="modal-field">
                 <label>Frequency</label>
                 <input list="ext-frequency-options" value={draft.frequency} onChange={(e) => updateSchedule('frequency', e.target.value)} placeholder="TDS" />
@@ -617,7 +768,9 @@ const AddExternalMedicineModal = ({
                 {draft.quantity_unit.trim() !== '' && !isValidUnit(draft.quantity_unit) && (
                   <div className="ext-qty-note blocked">The unit should be a word such as tablets, ml or tube — not a number.</div>
                 )}
-                {draft.qtyManual ? (
+                {!prof.counted ? (
+                  <div className="ext-qty-note">Total to buy{draft.quantity_unit.trim() ? `, in ${draft.quantity_unit.trim().toLowerCase()}` : ''}</div>
+                ) : draft.qtyManual ? (
                   <div className="ext-qty-note">
                     Entered by hand{calculatedQty !== null && ` \u2014 a full course would be ${calculatedQty}`}.{' '}
                     <button type="button" className="ext-qty-link" onClick={() => setQtyManual(false)}>
@@ -636,6 +789,24 @@ const AddExternalMedicineModal = ({
                 )}
               </div>
             </div>
+
+            <div className="ext-more-row">
+              <button type="button" className="ext-qty-link" onClick={() => setShowMore((v) => !v)} aria-expanded={showMore}>
+                {showMore ? 'Fewer options' : 'More options'}
+              </button>
+              {!showMore && <span className="ext-label-preview">On the slip: {extDosage(draft)}</span>}
+            </div>
+            {showMore && (
+              <div className="modal-field">
+                <label>Dosage on the slip</label>
+                <input value={extDosage(draft)} onChange={(e) => setDraft({ ...draft, dosage: e.target.value, dosageManual: true })} />
+                {draft.dosageManual && (
+                  <button type="button" className="ext-qty-link" onClick={() => setDraft({ ...draft, dosageManual: false, dosage: '' })}>
+                    Write it from the dose again
+                  </button>
+                )}
+              </div>
+            )}
 
             <div className="modal-field">
               <label>Instructions</label>
@@ -769,8 +940,7 @@ const ExternalMedicineSection = ({
         <ol className="ext-list">
           {items.map((it) => {
             const how = [
-              Number(it.dose_qty) > 0 ? `Take ${it.dose_qty} ${it.quantity_unit} each time` : null,
-              it.dosage,
+              extDosage(it),
               it.frequency,
               it.duration,
             ].filter(Boolean);

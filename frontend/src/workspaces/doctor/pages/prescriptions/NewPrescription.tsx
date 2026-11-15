@@ -16,7 +16,9 @@ import { getClinicSettings } from '../../lib/settings';
 import { listConsultations } from '../../lib/consultations';
 import { calculateAge } from '../../lib/queue';
 import InstructionsPicker from '../../components/InstructionsPicker';
-import ExternalMedicineSection, { draftToInput } from './ExternalMedicineSection';
+import { doseProfile, composeDosage, amountFromDosage, ALL_ROUTES } from '../../lib/doseForms';
+import type { DoseProfile } from '../../lib/doseForms';
+import ExternalMedicineSection, { draftToInput, extDosage } from './ExternalMedicineSection';
 import type { RepeatRequest } from '../../components/VisitSummary';
 import AddLabTestModal from '../labTestOrders/AddLabTestModal';
 import { listLabTestOrders } from '../../lib/labTestOrders';
@@ -52,7 +54,6 @@ const formatTime = (d: Date) => d.toLocaleTimeString(undefined, { hour: '2-digit
 
 const FREQUENCY_OPTIONS = ['OD - Once Daily', 'BD - Twice Daily', 'TDS - Three times daily', 'QID - Four times daily', 'PRN - As needed', 'STAT', 'HS - At bedtime'];
 const DURATION_OPTIONS = ['3 Days', '5 Days', '7 Days', '10 Days', '14 Days', '1 Month', 'Ongoing'];
-const ROUTE_OPTIONS = ['Oral', 'Topical', 'IV', 'IM', 'SC', 'Sublingual', 'Rectal', 'Inhalation', 'Ophthalmic', 'Otic'];
 
 // Mirrored server-side in backend/src/modules/prescriptions/qtyCalc.ts — this copy drives instant
 // UI calculation, the backend copy is the authoritative check at submit time and REJECTS a qty
@@ -154,11 +155,9 @@ const scheduledDoseCount = (frequency?: string, duration?: string): number | nul
 
 // Whole units to dispense, rounded UP so the patient is never short a fraction of a unit
 // (1.5 tablets x TDS x 5 days = 22.5 -> 23).
-/** "Take 1 Tablet each time · 500 mg · TDS · 5 Days · Oral · After food" for the final check. */
-const draftHowToTake = (it: { dose_qty: string; unit: string; dosage: string; frequency: string; duration: string; route: string; instructionChips: string[] }) =>
-  [Number(it.dose_qty) > 0 ? `Take ${it.dose_qty} ${it.unit} each time` : null, it.dosage, it.frequency, it.duration, it.route, it.instructionChips.join(', ')]
-    .filter(Boolean)
-    .join(' · ');
+/** "1 tablet · TDS · 5 Days · Oral · After food" for the final check. */
+const draftHowToTake = (it: DraftItem) =>
+  [lineDosage(it), it.frequency, it.duration, it.route, it.instructionChips.join(', ')].filter(Boolean).join(' · ');
 
 const computeExpectedQty = (frequency?: string, duration?: string, dose?: string | number): number | null => {
   const doses = scheduledDoseCount(frequency, duration);
@@ -209,16 +208,42 @@ interface DraftItem {
   qty: string;
   /** Taken long-term: stays on the ongoing-medicines list after the course runs out. */
   isLongTerm?: boolean;
+  /** The dose for medicines that are not counted in their dispensing unit: drops, puffs, where a
+   *  cream is applied, an injection dose (see doseForms.ts). */
+  doseAmount?: string;
+  /** The doctor typed the dosage text under "More options"; it is no longer written for them. */
+  dosageManual?: boolean;
+  showMore?: boolean;
 }
+
+const lineProfile = (it: Pick<DraftItem, 'form' | 'unit'>): DoseProfile => doseProfile(it.form, it.unit);
+
+/** The dosage text saved and printed for a line: written from the dose unless typed by hand. */
+const lineDosage = (it: DraftItem) =>
+  it.dosageManual ? it.dosage.trim() || 'As directed' : composeDosage(lineProfile(it), it.dose_qty, it.doseAmount ?? '', it.dosage || it.strength);
+
+/** Defaults for a line from what the medicine is: the usual route, and a quantity entered by hand
+ *  when the dose is not counted in the dispensing unit (drops, creams, inhalers, injections). */
+const shapeLine = (it: DraftItem): DraftItem => {
+  const p = lineProfile(it);
+  return {
+    ...it,
+    route: it.route || p.routeDefault,
+    doseAmount: it.doseAmount ?? amountFromDosage(p, it.dosage),
+    qtyManual: p.counted ? it.qtyManual : true,
+    dose_qty: p.counted ? it.dose_qty : '',
+  };
+};
 
 // Fills in defaults for drafts saved before external purchase/instructions-chips support existed,
 // and reconstructs instruction chips from a legacy plain-text `instructions` string if present.
-const normalizeItem = (it: any): DraftItem => ({
-  ...it,
-  dose_qty: Number(it.dose_qty) > 0 ? String(it.dose_qty) : '1',
-  qtyManual: it.qtyManual ?? false,
-  instructionChips: it.instructionChips ?? (it.instructions ? String(it.instructions).split(';').map((s: string) => s.trim()).filter(Boolean) : []),
-});
+const normalizeItem = (it: any): DraftItem =>
+  shapeLine({
+    ...it,
+    dose_qty: Number(it.dose_qty) > 0 ? String(it.dose_qty) : '1',
+    qtyManual: it.qtyManual ?? false,
+    instructionChips: it.instructionChips ?? (it.instructions ? String(it.instructions).split(';').map((s: string) => s.trim()).filter(Boolean) : []),
+  });
 
 type StockBadge = { emoji: string; label: string; cls: string } | null;
 const stockBadge = (item: DraftItem): StockBadge => {
@@ -456,7 +481,7 @@ const Builder = ({ consultationId }: { consultationId: number }) => {
           qty: String(expected ?? med.qty),
         });
       }
-      setItems((prev) => [...prev, ...added.filter((a) => !prev.some((p) => p.medicine_id === a.medicine_id))]);
+      setItems((prev) => [...prev, ...added.map(shapeLine).filter((a) => !prev.some((p) => p.medicine_id === a.medicine_id))]);
       setExternalItems((prev) => [
         ...prev,
         ...repeat.external
@@ -563,7 +588,7 @@ const Builder = ({ consultationId }: { consultationId: number }) => {
           isLongTerm: med.longTerm,
         });
       }
-      const newItems = added.filter((a) => !items.some((p) => p.medicine_id === a.medicine_id));
+      const newItems = added.map(shapeLine).filter((a) => !items.some((p) => p.medicine_id === a.medicine_id));
       const newExternal = addedExternal.filter((e) => !externalItems.some((p) => p.medicine_name.trim().toLowerCase() === e.medicine_name.trim().toLowerCase()));
       setItems((prev) => [...prev, ...newItems]);
       setExternalItems((prev) => [...prev, ...newExternal]);
@@ -589,7 +614,7 @@ const Builder = ({ consultationId }: { consultationId: number }) => {
     }
     setItems((prev) => [
       ...prev,
-      {
+      shapeLine({
         key: `${m.medicine_id}-${Date.now()}`,
         medicine_id: m.medicine_id,
         name: m.name,
@@ -608,14 +633,17 @@ const Builder = ({ consultationId }: { consultationId: number }) => {
         route: '',
         instructionChips: [],
         qty: '1',
-      },
+        doseAmount: '',
+      }),
     ]);
     setSearchTerm('');
     setSearchResults([]);
     setSearchOpen(false);
   };
 
-  const updateItem = (key: string, field: keyof DraftItem) => (e: React.ChangeEvent<HTMLInputElement>) => {
+  const patchItem = (key: string, patch: Partial<DraftItem>) => setItems((prev) => prev.map((it) => (it.key === key ? { ...it, ...patch } : it)));
+
+  const updateItem = (key: string, field: keyof DraftItem) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const value = e.target.value;
     setItems((prev) => prev.map((it) => (it.key === key ? { ...it, [field]: value } : it)));
   };
@@ -679,14 +707,14 @@ const Builder = ({ consultationId }: { consultationId: number }) => {
   const buildItemsInput = (): PrescriptionItemInput[] =>
     items.map((i) => ({
       medicine_id: i.medicine_id,
-      dosage: i.dosage,
+      dosage: lineDosage(i),
       frequency: i.frequency || undefined,
       duration: i.duration || undefined,
       route: i.route || undefined,
       instructions: i.instructionChips.length ? i.instructionChips.join('; ') : undefined,
       qty: Number(i.qty) || 1,
-      dose_qty: Number(i.dose_qty) > 0 ? Number(i.dose_qty) : undefined,
-      qty_manual: i.qtyManual || scheduledDoseCount(i.frequency, i.duration) === null,
+      dose_qty: lineProfile(i).counted && Number(i.dose_qty) > 0 ? Number(i.dose_qty) : undefined,
+      qty_manual: i.qtyManual || !lineProfile(i).counted || scheduledDoseCount(i.frequency, i.duration) === null,
       external_qty: 0,
       is_long_term: !!i.isLongTerm,
     }));
@@ -988,9 +1016,11 @@ const Builder = ({ consultationId }: { consultationId: number }) => {
               <ol className="rxp-items">
                 {items.map((it, i) => {
                   const qtyNum = Number(it.qty) || 0;
+                  const prof = lineProfile(it);
                   const scheduleCalculable = scheduledDoseCount(it.frequency, it.duration) !== null;
                   const expectedQty = it.qtyManual ? null : computeExpectedQty(it.frequency, it.duration, it.dose_qty);
-                  const needsDose = scheduleCalculable && !it.qtyManual && !(Number(it.dose_qty) > 0);
+                  const needsDose = prof.counted && scheduleCalculable && !it.qtyManual && !(Number(it.dose_qty) > 0);
+                  const routeChoices = [...prof.routeOptions, ...ALL_ROUTES.filter((r) => !prof.routeOptions.includes(r))];
                   const qtyNote = explainQty(it.frequency, it.duration, it.dose_qty, it.unit, it.qty);
                   const badge = stockBadge(it);
                   return (
@@ -998,7 +1028,10 @@ const Builder = ({ consultationId }: { consultationId: number }) => {
                       <div className="rxp-item-head">
                         <span className="rxp-item-num">{i + 1}</span>
                         <div className="rxp-item-title">
-                          <div className="rxb-med-name">{it.name}</div>
+                          <div className="rxb-med-name">
+                            {it.name}
+                            {it.strength && !it.name.toLowerCase().includes(it.strength.toLowerCase()) && <span className="rxp-strength"> {it.strength}</span>}
+                          </div>
                           <div className="rxb-med-generic">{[it.form, it.category].filter(Boolean).join(' · ') || it.generic_name}</div>
                           {(() => {
                             // Same generic as something the patient is already on, under another name.
@@ -1035,7 +1068,7 @@ const Builder = ({ consultationId }: { consultationId: number }) => {
                                   generic_name: it.generic_name,
                                   dosage_form: it.form,
                                   strength: it.strength,
-                                  dosage: it.dosage,
+                                  dosage: lineDosage(it),
                                   dose_qty: it.dose_qty,
                                   frequency: it.frequency,
                                   duration: it.duration,
@@ -1054,25 +1087,39 @@ const Builder = ({ consultationId }: { consultationId: number }) => {
                       </div>
 
                       <div className="rxp-item-fields">
-                        <label className="rxp-item-field">
-                          <span>Strength</span>
-                          <input className="rxb-table-input" value={it.dosage} onChange={updateItem(it.key, 'dosage')} placeholder="500 mg" />
-                        </label>
-                        <label className="rxp-item-field" title="How many units the patient takes each time — the quantity is calculated from this">
-                          <span>Take each time</span>
-                          <span className="rxp-dose-row">
-                            <input
-                              className="rxb-table-input"
-                              style={needsDose ? { borderColor: '#dc2626' } : undefined}
-                              type="text"
-                              inputMode="decimal"
-                              value={it.dose_qty}
-                              onChange={updateDose(it.key)}
-                              aria-label={`${it.unit} per dose`}
-                            />
-                            {it.unit}
-                          </span>
-                        </label>
+                        {prof.counted ? (
+                          <label className="rxp-item-field" title="How many the patient takes each time — the quantity is calculated from this">
+                            <span>{prof.doseLabel}</span>
+                            <span className="rxp-dose-row">
+                              <input
+                                className="rxb-table-input"
+                                style={needsDose ? { borderColor: '#dc2626' } : undefined}
+                                type="text"
+                                inputMode="decimal"
+                                value={it.dose_qty}
+                                onChange={updateDose(it.key)}
+                                aria-label={`${prof.doseUnit(2)} per dose`}
+                              />
+                              {prof.doseUnit(Number(it.dose_qty) || 1)}
+                            </span>
+                          </label>
+                        ) : (
+                          <label className="rxp-item-field">
+                            <span>{prof.doseLabel}</span>
+                            <span className="rxp-dose-row">
+                              <input
+                                className="rxb-table-input"
+                                type="text"
+                                inputMode={prof.amountKind === 'number' ? 'decimal' : 'text'}
+                                value={it.doseAmount ?? ''}
+                                onChange={(e) => patchItem(it.key, { doseAmount: e.target.value })}
+                                placeholder={prof.amountPlaceholder}
+                                aria-label={prof.doseLabel}
+                              />
+                              {prof.amountKind === 'number' && prof.doseUnit(Number(it.doseAmount) || 2)}
+                            </span>
+                          </label>
+                        )}
                         <label className="rxp-item-field">
                           <span>Frequency</span>
                           <input
@@ -1094,8 +1141,16 @@ const Builder = ({ consultationId }: { consultationId: number }) => {
                           />
                         </label>
                         <label className="rxp-item-field">
-                          <span>Route</span>
-                          <input className="rxb-table-input" list="rxp-route-options" value={it.route} onChange={updateItem(it.key, 'route')} placeholder="Oral" />
+                          <span>{prof.kind === 'drops' ? 'Where' : 'Route'}</span>
+                          <select className="rxb-table-input" value={it.route} onChange={updateItem(it.key, 'route')}>
+                            <option value="">—</option>
+                            {it.route && !routeChoices.includes(it.route) && <option value={it.route}>{it.route}</option>}
+                            {routeChoices.map((r) => (
+                              <option key={r} value={r}>
+                                {r}
+                              </option>
+                            ))}
+                          </select>
                         </label>
                         <div className="rxp-item-field">
                           <span>Quantity</span>
@@ -1120,10 +1175,10 @@ const Builder = ({ consultationId }: { consultationId: number }) => {
                           ) : (
                             <>
                               <input className="rxb-table-input qty" type="number" min={1} value={it.qty} onChange={updateQtyManual(it.key)} aria-label="Quantity" />
-                              <div className={`rxp-qty-note ${it.qtyManual ? 'manual' : 'blocked'}`}>
-                                {it.qtyManual ? `Manual (${it.unit.toLowerCase()})` : qtyNote.text}
+                              <div className={`rxp-qty-note ${!prof.counted ? 'hint' : it.qtyManual ? 'manual' : 'blocked'}`}>
+                                {!prof.counted ? `Total to dispense, in ${it.unit.toLowerCase()}` : it.qtyManual ? `Manual (${it.unit.toLowerCase()})` : qtyNote.text}
                               </div>
-                              {it.qtyManual && scheduleCalculable && (
+                              {prof.counted && it.qtyManual && scheduleCalculable && (
                                 <button type="button" className="rxp-qty-link" onClick={() => setQtyManual(it.key, false)}>
                                   Calculate from dose
                                 </button>
@@ -1132,6 +1187,30 @@ const Builder = ({ consultationId }: { consultationId: number }) => {
                           )}
                         </div>
                       </div>
+
+                      <div className="rxp-item-more">
+                        <button type="button" className="rxp-qty-link" onClick={() => patchItem(it.key, { showMore: !it.showMore })} aria-expanded={!!it.showMore}>
+                          {it.showMore ? 'Fewer options' : 'More options'}
+                        </button>
+                        {!it.showMore && <span className="rxp-label-preview">Label: {lineDosage(it)}</span>}
+                      </div>
+                      {it.showMore && (
+                        <div className="rxp-item-fields rxp-item-fields-more">
+                          <label className="rxp-item-field rxp-item-field-wide" title="What the pharmacy screen and the label show for the dose. Written for you from the dose above unless you change it here.">
+                            <span>Dosage on the label</span>
+                            <input
+                              className="rxb-table-input"
+                              value={lineDosage(it)}
+                              onChange={(e) => patchItem(it.key, { dosage: e.target.value, dosageManual: true })}
+                            />
+                            {it.dosageManual && (
+                              <button type="button" className="rxp-qty-link" onClick={() => patchItem(it.key, { dosageManual: false, dosage: '' })}>
+                                Write it from the dose again
+                              </button>
+                            )}
+                          </label>
+                        </div>
+                      )}
 
                       <div className="rxp-item-field rxp-item-instructions">
                         <span>Instructions</span>
@@ -1160,11 +1239,6 @@ const Builder = ({ consultationId }: { consultationId: number }) => {
             </datalist>
             <datalist id="rxp-duration-options">
               {DURATION_OPTIONS.map((o) => (
-                <option key={o} value={o} />
-              ))}
-            </datalist>
-            <datalist id="rxp-route-options">
-              {ROUTE_OPTIONS.map((o) => (
                 <option key={o} value={o} />
               ))}
             </datalist>
@@ -1347,7 +1421,7 @@ const Builder = ({ consultationId }: { consultationId: number }) => {
                           {e.strength ? ` ${e.strength}` : ''}
                         </strong>
                         <span>
-                          {[Number(e.dose_qty) > 0 ? `Take ${e.dose_qty} ${e.quantity_unit} each time` : null, e.dosage, e.frequency, e.duration]
+                          {[extDosage(e), e.frequency, e.duration]
                             .filter(Boolean)
                             .join(' · ')}
                         </span>

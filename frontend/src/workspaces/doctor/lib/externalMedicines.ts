@@ -69,3 +69,29 @@ export const previewExternalMedicineSlip = async (prescriptionId: number) => {
   const url = URL.createObjectURL(res.data as Blob);
   window.open(url, '_blank');
 };
+
+// The clinic's shared list of outside medicines typed in before, most used first. The details and
+// dosing are those of the latest use, offered as editable defaults.
+export interface SavedExternalMedicine {
+  libraryId: number;
+  medicineName: string;
+  genericName: string | null;
+  brandName: string | null;
+  dosageForm: string;
+  strength: string | null;
+  quantityUnit: string;
+  dosage: string | null;
+  doseQty: number | null;
+  frequency: string | null;
+  duration: string | null;
+  instructions: string | null;
+  isLongTerm: boolean;
+  useCount: number;
+  lastUsedAt: string;
+}
+
+export const searchSavedExternalMedicines = (search: string) =>
+  api.get<SavedExternalMedicine[]>('/external-medicines/library', { params: search.trim() ? { search: search.trim() } : {} }).then((r) => r.data);
+
+/** Takes a saved medicine off the suggestions; past prescriptions are not changed. */
+export const removeSavedExternalMedicine = (libraryId: number) => api.delete(`/external-medicines/library/${libraryId}`);

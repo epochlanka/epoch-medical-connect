@@ -243,3 +243,43 @@
   .ext-item { grid-template-columns: minmax(0, 1fr) auto; }
   .ext-item-qty { align-items: flex-start; grid-row: 2; }
 }
+
+/* Saved outside medicines in the search: details on the left, use count and remove on the right. */
+.ext-saved-results {
+  max-height: 260px;
+}
+.ext-saved-main {
+  flex: 1;
+  min-width: 0;
+}
+.ext-saved-uses {
+  font-size: 12px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.ext-saved-remove {
+  flex: none;
+}
+
+/* Form-aware dose fields (doseForms.ts). */
+.ext-take-row input.ext-amount-text {
+  width: 100%;
+}
+.ext-more-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ext-label-preview {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+/* The quantity and its unit share one column: let both shrink instead of overflowing the window. */
+.ext-form-row > * {
+  min-width: 0;
+}
+.ext-form .modal-field > div[style] > input {
+  min-width: 0;
+  flex: 1;
+}

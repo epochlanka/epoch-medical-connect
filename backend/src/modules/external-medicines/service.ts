@@ -1,5 +1,6 @@
 import { prisma } from '../../lib/prisma';
 import { NotFoundError, ValidationError, ForbiddenError } from './errors';
+import { rememberExternalMedicines } from './library';
 
 
 interface Actor {
@@ -111,26 +112,30 @@ export const createExternalMedicine = async (prescriptionId: number, input: Exte
   assertLineValid(input);
   const resolved = await resolveMedicineFields(prisma, input);
 
-  const row = await prisma.externalPrescriptionMedicine.create({
-    data: {
-      prescription_id: prescriptionId,
-      patient_id: patientId,
-      doctor_id: doctorId,
-      medicine_id: resolved.medicine_id,
-      medicine_name: resolved.medicine_name,
-      generic_name: resolved.generic_name,
-      brand_name: resolved.brand_name,
-      dosage_form: input.dosage_form.trim(),
-      strength: input.strength || undefined,
-      dosage: input.dosage.trim(),
-      dose_qty: input.dose_qty ?? undefined,
-      frequency: input.frequency || undefined,
-      duration: input.duration || undefined,
-      quantity: input.quantity,
-      quantity_unit: input.quantity_unit.trim(),
-      instructions: input.instructions || undefined,
-      is_long_term: !!input.is_long_term,
-    },
+  const row = await prisma.$transaction(async (tx) => {
+    const created = await tx.externalPrescriptionMedicine.create({
+      data: {
+        prescription_id: prescriptionId,
+        patient_id: patientId,
+        doctor_id: doctorId,
+        medicine_id: resolved.medicine_id,
+        medicine_name: resolved.medicine_name,
+        generic_name: resolved.generic_name,
+        brand_name: resolved.brand_name,
+        dosage_form: input.dosage_form.trim(),
+        strength: input.strength || undefined,
+        dosage: input.dosage.trim(),
+        dose_qty: input.dose_qty ?? undefined,
+        frequency: input.frequency || undefined,
+        duration: input.duration || undefined,
+        quantity: input.quantity,
+        quantity_unit: input.quantity_unit.trim(),
+        instructions: input.instructions || undefined,
+        is_long_term: !!input.is_long_term,
+      },
+    });
+    await rememberExternalMedicines(tx, [created], actor.user_id);
+    return created;
   });
   return serialize(row);
 };
@@ -170,6 +175,7 @@ export const bulkCreateExternalMedicines = async (prescriptionId: number, items:
       });
       created.push(row);
     }
+    await rememberExternalMedicines(tx, created, actor.user_id);
     return created.map(serialize);
   });
 };

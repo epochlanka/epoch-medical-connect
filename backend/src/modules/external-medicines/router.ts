@@ -48,6 +48,12 @@ router.get('/prescription/:prescriptionId/slip', requireRole(READ_ROLES), valida
 router.get('/prescription/:prescriptionId', requireRole(READ_ROLES), validate(prescriptionIdParams), controller.listByPrescription);
 router.post('/prescription/:prescriptionId', requireRole(WRITE_ROLES), validate(createSchema), controller.create);
 
+// The clinic's shared list of outside medicines typed in before (see library.ts).
+const librarySearch = z.object({ query: z.object({ search: z.string().max(100).optional() }) });
+const libraryParams = z.object({ params: z.object({ libraryId: z.coerce.number().int().positive() }) });
+router.get('/library', requireRole(WRITE_ROLES), validate(librarySearch), controller.searchLibrary);
+router.delete('/library/:libraryId', requireRole(WRITE_ROLES), validate(libraryParams), controller.hideLibraryEntry);
+
 router.get('/patient/:patientId', requireRole(READ_ROLES), validate(patientParams), controller.listByPatient);
 
 router.put('/:extItemId', requireRole(WRITE_ROLES), validate(updateSchema), controller.update);
