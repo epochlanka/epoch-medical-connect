@@ -295,4 +295,75 @@ describe('Lab Test Orders API', () => {
     expect(cancelled.status).toBe(200);
     expect(cancelled.body.status).toBe('Cancelled');
   });
+  describe('front desk entering results, and remembering a typed-in test', () => {
+    const typedName = `Vitamin B12 Panel ${runId}`;
+    const orderTyped = async (name = typedName) => {
+      const created = await makeDraftConsultation(doctorToken, doctorId);
+      const res = await request(app).post('/api/v1/lab-test-orders').set('Authorization', `Bearer ${doctorToken}`).send({ consultation_id: created.consultationId, test_name: name });
+      expect(res.status).toBe(201);
+      return res.body.lab_test_order_id as number;
+    };
+    const lines = [
+      { parameter_name: 'Vitamin B12', unit: 'pg/mL', reference_range: '200-900', result_value: '150' },
+      { parameter_name: 'Folate', unit: 'ng/mL', reference_range: '3-17', result_value: '8' },
+    ];
+
+    it('lets the front desk type in values for a pending test; it stays with the doctor as Report Received', async () => {
+      const id = await orderTyped();
+      const res = await request(app).post(`/api/v1/lab-test-orders/${id}/results`).set('Authorization', `Bearer ${receptionistToken}`).send({ results: lines });
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe('Report Received');
+      expect(res.body.results).toHaveLength(2);
+      expect(res.body.results.find((r: any) => r.parameter_name === 'Vitamin B12').result_flag).toBe('Low');
+      // Typing again replaces, never duplicates.
+      const again = await request(app).post(`/api/v1/lab-test-orders/${id}/results`).set('Authorization', `Bearer ${receptionistToken}`).send({ results: [lines[0]] });
+      expect(again.body.results).toHaveLength(1);
+      // The doctor completes it.
+      const done = await request(app).post(`/api/v1/lab-test-orders/${id}/complete`).set('Authorization', `Bearer ${doctorToken}`).send({ results: lines, interpretation: 'Low B12' });
+      expect(done.status).toBe(200);
+      expect(done.body.status).toBe('Completed');
+      // Not after it is completed.
+      const late = await request(app).post(`/api/v1/lab-test-orders/${id}/results`).set('Authorization', `Bearer ${receptionistToken}`).send({ results: lines });
+      expect(late.status).toBe(400);
+    });
+
+    it('refuses empty values and a pharmacist', async () => {
+      const id = await orderTyped();
+      const empty = await request(app).post(`/api/v1/lab-test-orders/${id}/results`).set('Authorization', `Bearer ${receptionistToken}`).send({ results: [{ parameter_name: 'X', result_value: ' ' }] });
+      expect(empty.status).toBe(400);
+      const pharmacist = await request(app).post(`/api/v1/lab-test-orders/${id}/results`).set('Authorization', `Bearer ${pharmacistToken}`).send({ results: lines });
+      expect(pharmacist.status).toBe(403);
+    });
+
+    it('saves the parameters of a typed-in test, so the next order of it comes with them', async () => {
+      const id = await orderTyped();
+      const res = await request(app).post(`/api/v1/lab-test-orders/${id}/results`).set('Authorization', `Bearer ${receptionistToken}`).send({ results: lines, save_parameters: true });
+      expect(res.status).toBe(200);
+      const testId = res.body.catalog_test_id;
+      expect(testId).toBeTruthy();
+      const params = await request(app).get(`/api/v1/lab-test-orders/catalog/${testId}/parameters`).set('Authorization', `Bearer ${doctorToken}`);
+      expect(params.body.map((p: any) => [p.parameter_name, p.unit, p.reference_range])).toEqual([
+        ['Vitamin B12', 'pg/mL', '200-900'],
+        ['Folate', 'ng/mL', '3-17'],
+      ]);
+      expect(res.body.results.every((r: any) => r.parameter_id)).toBe(true);
+
+      // Same name typed again (different case): the same list entry; a new parameter is added, existing ones kept.
+      const second = await orderTyped(typedName.toUpperCase());
+      const res2 = await request(app)
+        .post(`/api/v1/lab-test-orders/${second}/complete`)
+        .set('Authorization', `Bearer ${doctorToken}`)
+        .send({ results: [{ parameter_name: 'x' , result_value: '' }], save_parameters: true });
+      expect(res2.status).toBe(400); // not received yet, nothing saved
+      await request(app).post(`/api/v1/lab-test-orders/${second}/results`).set('Authorization', `Bearer ${doctorToken}`).send({ results: [{ parameter_name: 'folate', unit: 'other', result_value: '5' }, { parameter_name: 'Ferritin', unit: 'ng/mL', reference_range: '30-400', result_value: '50' }], save_parameters: true }).expect(200);
+      const after = await prisma.labTestParameter.findMany({ where: { test_id: testId }, orderBy: { display_order: 'asc' } });
+      expect(after.map((p) => [p.parameter_name, p.unit])).toEqual([
+        ['Vitamin B12', 'pg/mL'],
+        ['Folate', 'ng/mL'],
+        ['Ferritin', 'ng/mL'],
+      ]);
+      expect((await prisma.labTestOrder.findUniqueOrThrow({ where: { lab_test_order_id: second } })).catalog_test_id).toBe(testId);
+      expect(await prisma.labTestCatalog.count({ where: { test_name: { equals: typedName, mode: 'insensitive' } } })).toBe(1);
+    });
+  });
 });

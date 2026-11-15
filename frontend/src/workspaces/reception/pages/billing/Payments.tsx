@@ -27,6 +27,7 @@ import '../patients/register.css';
 import '../appointments/bookAppointment.css';
 import './consolidatedInvoice.css';
 import './payments.css';
+import { PatientLink } from '../../../../shared/patients/PatientPanel';
 
 const isoDaysAgo = (n: number) => {
   const d = new Date();
@@ -299,7 +300,7 @@ const Payments = () => {
                     </button>
                   </td>
                   <td>
-                    <div className="pat-name">{r.patientName}</div>
+                    <div className="pat-name"><PatientLink patientId={r.patientId}>{r.patientName}</PatientLink></div>
                     <span className="pat-muted" style={{ fontSize: 11.5 }}>
                       {r.patientId}
                     </span>

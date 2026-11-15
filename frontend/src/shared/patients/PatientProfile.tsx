@@ -73,8 +73,11 @@ const Field = ({ label, value }: { label: string; value: ReactNode }) => (
   </div>
 );
 
-export default function PatientProfile() {
-  const { patientId = '' } = useParams();
+// Also shown in the side panel (PatientPanel.tsx): then the patient comes as a prop, and opening a
+// household member switches the panel to them instead of leaving the screen underneath.
+export default function PatientProfile({ patientId: shownId, onOpenPatient }: { patientId?: string; onOpenPatient?: (patientId: string) => void } = {}) {
+  const { patientId: routeId = '' } = useParams();
+  const patientId = shownId ?? routeId;
   const { user } = useAuth();
   const workspace = useWorkspace();
   const navigate = useWorkspaceNavigate();
@@ -113,8 +116,8 @@ export default function PatientProfile() {
   const loadedName = patient.data?.full_name;
   // The workspace frame names the tab after the screen; on a profile, the patient's name is clearer.
   useEffect(() => {
-    if (loadedName) document.title = `${loadedName} · Patient`;
-  }, [loadedName]);
+    if (loadedName && !shownId) document.title = `${loadedName} · Patient`;
+  }, [loadedName, shownId]);
 
   if (patient.loading) return <div className="pp"><p className="pp-muted">Loading patient…</p></div>;
   if (!patient.data) return <div className="pp"><div className="pp-error">This patient could not be found ({patientId}).</div></div>;
@@ -448,7 +451,7 @@ export default function PatientProfile() {
                 .filter((m) => m.patient_id !== p.patient_id)
                 .map((m) => (
                   <li key={m.patient_id}>
-                    <button type="button" className="pp-link" onClick={() => navigate(`/patients/${encodeURIComponent(m.patient_id)}`)}>
+                    <button type="button" className="pp-link" onClick={() => (onOpenPatient ? onOpenPatient(m.patient_id) : navigate(`/patients/${encodeURIComponent(m.patient_id)}`))}>
                       {m.full_name}
                     </button>
                     <span>{[m.relationship_to_head, ageLabel(m.dob), shortPatientNumber(m.patient_id) && `No. ${shortPatientNumber(m.patient_id)}`].filter(Boolean).join(' · ')}</span>

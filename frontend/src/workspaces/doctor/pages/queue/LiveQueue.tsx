@@ -20,6 +20,7 @@ import SkipModal from './SkipModal';
 import '../dashboard/dashboard.css';
 import '../../styles/shared.css';
 import './queue.css';
+import { PatientLink } from '../../../../shared/patients/PatientPanel';
 
 const STATUS_BADGE: Record<AppointmentStatus, string> = {
   Waiting: 'badge-gray',
@@ -216,7 +217,7 @@ const LiveQueue = () => {
                           </td>
                           <td>
                             <div style={{ fontWeight: 600, color: '#0f172a' }}>
-                              {displayPatientName(a)} {a.is_temporary && <span className="badge badge-amber">Temporary</span>}
+                              <PatientLink patientId={a.patient_id}>{displayPatientName(a)}</PatientLink> {a.is_temporary && <span className="badge badge-amber">Temporary</span>}
                             </div>
                             <span className="pat-muted" style={{ fontSize: 13 }}>
                               {displayPatientId(a)}
@@ -297,7 +298,7 @@ const LiveQueue = () => {
                 <div className="q-now-row">
                   <span className="q-now-label">Patient</span>
                   <span className="q-now-value">
-                    {displayPatientName(nowCalling)} {nowCalling.is_temporary && <span className="badge badge-amber">Temporary</span>}
+                    <PatientLink patientId={nowCalling.patient_id}>{displayPatientName(nowCalling)}</PatientLink> {nowCalling.is_temporary && <span className="badge badge-amber">Temporary</span>}
                   </span>
                 </div>
                 <div className="q-now-row">
@@ -401,7 +402,7 @@ const LiveQueue = () => {
                         </td>
                         <td>
                           <div style={{ fontWeight: 600 }}>
-                            {displayPatientName(a)} {a.is_temporary && <span className="badge badge-amber">Temporary</span>}
+                            <PatientLink patientId={a.patient_id}>{displayPatientName(a)}</PatientLink> {a.is_temporary && <span className="badge badge-amber">Temporary</span>}
                           </div>
                           <span className="pat-muted" style={{ fontSize: 13 }}>
                             {displayPatientId(a)}

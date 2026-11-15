@@ -9,6 +9,7 @@ import {
   WORKSPACES,
 } from './workspaces';
 import { WorkspaceProvider } from './WorkspaceContext';
+import { PatientPanelProvider } from '../shared/patients/PatientPanel';
 
 /**
  * Route protection here is for usability — showing people only what they can use, and sending them
@@ -40,7 +41,11 @@ export const RequireWorkspace = ({ id, children }: { id: WorkspaceId; children: 
   // Entitled, but this workspace has not moved into the unified app yet — hand off to its portal.
   if (!workspace.migrated) return <LegacyPortalHandoff workspaceId={id} />;
 
-  return <WorkspaceProvider workspace={workspace}>{children}</WorkspaceProvider>;
+  return (
+    <WorkspaceProvider workspace={workspace}>
+      <PatientPanelProvider>{children}</PatientPanelProvider>
+    </WorkspaceProvider>
+  );
 };
 
 /**

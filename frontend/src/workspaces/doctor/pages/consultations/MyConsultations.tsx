@@ -25,6 +25,7 @@ import '../dashboard/dashboard.css';
 import '../../styles/shared.css';
 import '../queue/queue.css';
 import './consultation.css';
+import { PatientLink } from '../../../../shared/patients/PatientPanel';
 
 const initials = (name: string) =>
   name
@@ -339,7 +340,7 @@ const MyConsultations = () => {
                           {c.patientPhotoUrl ? <img className="pat-avatar" src={fileUrl(c.patientPhotoUrl)} alt="" /> : <div className="pat-avatar">{initials(c.patientName)}</div>}
                           <div>
                             <div className="pat-name">
-                              {c.patientName} {c.isTemporary && <span className="badge badge-amber">Temporary</span>}
+                              <PatientLink patientId={c.patientId}>{c.patientName}</PatientLink> {c.isTemporary && <span className="badge badge-amber">Temporary</span>}
                             </div>
                             <span className="pat-muted" style={{ fontSize: 13 }}>
                               {c.patientId ?? 'Temporary'}

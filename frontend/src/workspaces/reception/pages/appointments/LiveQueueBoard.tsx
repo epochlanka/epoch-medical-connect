@@ -32,6 +32,7 @@ import './bookAppointment.css';
 import './walkIn.css';
 import './liveQueue.css';
 import Modal from '../../components/Modal';
+import { PatientLink } from '../../../../shared/patients/PatientPanel';
 
 const REFRESH_SECONDS = 30;
 const PREVIEW_COUNT = 4;
@@ -537,7 +538,7 @@ const LiveQueueBoard = () => {
                     {board!.upcoming.map((c) => (
                       <tr key={c.appointment_id}>
                         <td>{formatTime(c.scheduled_at)}</td>
-                        <td>{c.patient_name}</td>
+                        <td><PatientLink patientId={c.patient_id}>{c.patient_name}</PatientLink></td>
                         <td>
                           <span className="badge badge-blue">{c.patient_id}</span>
                         </td>
@@ -578,7 +579,7 @@ const LiveQueueBoard = () => {
                 <>
                   <div className="lq-next-token-number">{selectedCard.token}</div>
                   <div className="lq-next-token-name">
-                    {selectedCard.patient_name} {selectedCard.is_temporary && <span className="lq-temp-badge">Temporary</span>}
+                    <PatientLink patientId={selectedCard.patient_id}>{selectedCard.patient_name}</PatientLink> {selectedCard.is_temporary && <span className="lq-temp-badge">Temporary</span>}
                   </div>
                   <div className="lq-next-token-sub">
                     {selectedCard.is_walk_in ? 'Walk-in' : selectedCard.visit_type} · {formatTime(selectedCard.scheduled_at)}

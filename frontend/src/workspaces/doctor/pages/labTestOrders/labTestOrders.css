@@ -292,3 +292,84 @@
   border-bottom: 1px solid var(--surface-wash);
   color: #334155;
 }
+
+.lab-entry-hint {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: #64748b;
+}
+.lab-save-params {
+  display: flex !important;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #eff6ff;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: #1e3a8a;
+  cursor: pointer;
+}
+.lab-save-params input {
+  margin-top: 2px;
+}
+
+/* The results window is also opened from the reception workspace, which does not load the doctor's
+   page styles; keep everything it needs here. */
+.lab-result-modal {
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+}
+.lab-result-modal .modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+}
+.lab-result-modal .modal-field > label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #334155;
+}
+.lab-result-modal .modal-field textarea {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+}
+.lab-result-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.lab-result-table th {
+  text-align: left;
+  font-size: 11px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+  padding: 6px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.lab-result-table td {
+  padding: 4px 6px;
+  border-bottom: 1px solid #f8fafc;
+}
+.lab-result-modal .lab-cell-input {
+  padding: 6px 8px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+.lab-cell-input:disabled {
+  background: #f8fafc;
+  color: #334155;
+}
+.lab-result-modal .lab-save-params input {
+  padding: 0;
+  width: 16px;
+  height: 16px;
+}

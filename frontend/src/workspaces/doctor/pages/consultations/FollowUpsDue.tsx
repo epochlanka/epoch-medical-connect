@@ -23,6 +23,7 @@ import '../dashboard/dashboard.css';
 import '../../styles/shared.css';
 import '../queue/queue.css';
 import './consultation.css';
+import { PatientLink } from '../../../../shared/patients/PatientPanel';
 
 const initials = (name: string) =>
   name
@@ -234,7 +235,7 @@ const FollowUpsDue = () => {
                               <div className="pat-avatar">{initials(r.patient.full_name)}</div>
                             )}
                             <div>
-                              <div className="pat-name">{r.patient.full_name}</div>
+                              <div className="pat-name"><PatientLink patientId={r.patient.patient_id}>{r.patient.full_name}</PatientLink></div>
                               <span className="pat-muted" style={{ fontSize: 13 }}>
                                 {r.patient.patient_id}
                               </span>

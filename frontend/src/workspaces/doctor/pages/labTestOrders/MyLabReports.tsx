@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useWorkspaceNavigate as useNavigate } from '../../../../app/WorkspaceContext';
 import { useAuth } from '../../context/AuthContext';
 import { useApiData } from '../../hooks/useApiData';
 import { listLabTestOrders, printLabTestOrder, printLabResultReport, markReportReceived } from '../../lib/labTestOrders';
@@ -11,6 +10,7 @@ import '../dashboard/dashboard.css';
 import '../../styles/shared.css';
 import '../patients/patients.css';
 import './labTestOrders.css';
+import { PatientLink } from '../../../../shared/patients/PatientPanel';
 
 const formatDateTime = (iso: string) => new Date(iso).toLocaleString(undefined, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
@@ -25,7 +25,6 @@ const LAB_STATUS_BADGE: Record<LabTestOrderStatus, string> = {
 // "Patient Search → Lab Results" spec section 24, but scoped to every patient rather than one —
 // the destination for the Dashboard's "Pending Lab Reports" widget, and the doctor's own worklist.
 const MyLabReports = () => {
-  const navigate = useNavigate();
   const { user } = useAuth();
   const [status, setStatus] = useState<LabTestOrderStatus | ''>('');
   const [searchInput, setSearchInput] = useState('');
@@ -109,9 +108,7 @@ const MyLabReports = () => {
                 <tr key={o.lab_test_order_id}>
                   <td>{o.request_number}</td>
                   <td>
-                    <button className="pat-id-link" onClick={() => navigate(`/patients/${o.patient_id}`)}>
-                      {o.patient?.full_name}
-                    </button>
+                    <PatientLink patientId={o.patient_id}>{o.patient?.full_name}</PatientLink>
                   </td>
                   <td>
                     {o.test_name}

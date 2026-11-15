@@ -31,6 +31,7 @@ import '../../styles/shared.css';
 import '../dashboard/dashboard.css';
 import './bookAppointment.css';
 import './prescriptions.css';
+import { PatientLink } from '../../../../shared/patients/PatientPanel';
 
 const isoDaysAgo = (n: number) => {
   const d = new Date();
@@ -381,7 +382,7 @@ const Prescriptions = () => {
                     </td>
                     <td>{formatDateTime(rx.issuedAt)}</td>
                     <td>
-                      <div className="pat-name">{rx.patientName}</div>
+                      <div className="pat-name"><PatientLink patientId={rx.patientId}>{rx.patientName}</PatientLink></div>
                       <span className="pat-muted" style={{ fontSize: 11.5 }}>
                         {rx.patientId}
                       </span>

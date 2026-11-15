@@ -20,6 +20,9 @@ const WRITE_ROLES = ['Doctor']; // only a doctor may create a lab test order (bu
 const RECEIVE_ROLES = ['Admin', 'Doctor', 'Receptionist'];
 const RESULT_ROLES = ['Admin', 'Doctor']; // entering/finalizing clinical values — Reception excluded
 const CANCEL_ROLES = ['Doctor', 'Admin'];
+// Typing in the values from the lab's report. The front desk may do this too; the order then stays
+// "Report Received" for the doctor to review and complete (completing stays RESULT_ROLES).
+const ENTRY_ROLES = ['Admin', 'Doctor', 'Receptionist'];
 
 const resultParameterSchema = z.object({
   parameter_id: z.number().int().positive().optional(),
@@ -69,7 +72,13 @@ const completeSchema = z.object({
     results: z.array(resultParameterSchema).min(1),
     doctor_notes: z.string().optional(),
     interpretation: z.string().optional(),
+    save_parameters: z.boolean().optional(),
   }),
+});
+
+const saveResultsSchema = z.object({
+  params: idParams,
+  body: z.object({ results: z.array(resultParameterSchema).min(1), save_parameters: z.boolean().optional() }),
 });
 
 const contextParamsSchema = z.object({ params: z.object({ consultationId: z.coerce.number().int().positive() }) });
@@ -114,6 +123,7 @@ router.get('/:labTestOrderId/print', requireRole(READ_ROLES), validate(idParamsS
 router.get('/:labTestOrderId/result-print', requireRole(RESULT_ROLES), validate(idParamsSchema), controller.printResult);
 router.post('/:labTestOrderId/received', requireRole(RECEIVE_ROLES), validate(idParamsSchema), uploadReportMiddleware, controller.markReceived);
 router.post('/:labTestOrderId/complete', requireRole(RESULT_ROLES), validate(completeSchema), controller.complete);
+router.post('/:labTestOrderId/results', requireRole(ENTRY_ROLES), validate(saveResultsSchema), controller.saveResults);
 router.put('/:labTestOrderId/complete', requireRole(RESULT_ROLES), validate(completeSchema), controller.amendCompleted);
 router.post('/:labTestOrderId/cancel', requireRole(CANCEL_ROLES), validate(idParamsSchema), controller.cancel);
 

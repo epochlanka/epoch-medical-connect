@@ -12,6 +12,7 @@ import '../dashboard/dashboard.css';
 import '../patients/register.css';
 import './payments.css';
 import './frontDeskMoney.css';
+import { PatientLink } from '../../../../shared/patients/PatientPanel';
 
 const ageLabel = (days: number) => (days === 0 ? 'Today' : days === 1 ? '1 day' : `${days} days`);
 
@@ -179,7 +180,7 @@ const OutstandingBalances = () => {
                   <Fragment key={g.key}>
                     <tr className={open ? 'fdm-row-open' : undefined}>
                       <td>
-                        <div className="pat-name">{g.patientName}</div>
+                        <div className="pat-name"><PatientLink patientId={g.patientId}>{g.patientName}</PatientLink></div>
                         <span className="pat-muted" style={{ fontSize: 11.5 }}>
                           {g.patientId ?? 'Unregistered walk-in'}
                         </span>

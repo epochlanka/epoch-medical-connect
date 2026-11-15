@@ -26,6 +26,7 @@ import '../../styles/shared.css';
 import '../queue/queue.css';
 import '../consultations/consultation.css';
 import './prescriptions.css';
+import { PatientLink } from '../../../../shared/patients/PatientPanel';
 
 const initials = (name: string) =>
   name
@@ -261,7 +262,7 @@ const MyPrescriptions = () => {
                           <div className="pat-name-cell">
                             {r.patientPhotoUrl ? <img className="pat-avatar" src={fileUrl(r.patientPhotoUrl)} alt="" /> : <div className="pat-avatar">{initials(r.patientName)}</div>}
                             <div>
-                              <div className="pat-name">{r.patientName}</div>
+                              <div className="pat-name"><PatientLink patientId={r.patientId}>{r.patientName}</PatientLink></div>
                               <span className="pat-muted" style={{ fontSize: 13 }}>
                                 {r.patientId}
                               </span>

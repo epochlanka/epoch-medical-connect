@@ -53,6 +53,7 @@ import VisitSummary from '../../components/VisitSummary';
 import type { DiagnosisEntry } from '../../lib/consultations';
 import type { RepeatRequest } from '../../components/VisitSummary';
 import '../labTestOrders/labTestOrders.css';
+import { PatientLink } from '../../../../shared/patients/PatientPanel';
 
 const initials = (name: string) =>
   name
@@ -196,7 +197,7 @@ const WorkspacePicker = () => {
                 <td>
                   <span className="q-token next">{tokenNumber(a.appointment_id)}</span>
                 </td>
-                <td style={{ fontWeight: 600 }}>{displayPatientName(a)}</td>
+                <td style={{ fontWeight: 600 }}><PatientLink patientId={a.patient_id}>{displayPatientName(a)}</PatientLink></td>
                 <td>
                   <button className="pat-btn primary" style={{ fontSize: 13, padding: '6px 12px' }} onClick={() => navigate(`/consultations/workspace/${a.appointment_id}`)}>
                     Open

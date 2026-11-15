@@ -247,7 +247,96 @@ interface CompleteResultInput {
   results: { parameter_id?: number; parameter_name: string; unit?: string; reference_range?: string; result_value: string }[];
   doctor_notes?: string;
   interpretation?: string;
+  /** Keep this test's parameters (names, units, normal ranges) in the clinic's test list, so the
+   *  next order of the same test comes with them already in the results table. */
+  save_parameters?: boolean;
 }
+
+type ResultLine = CompleteResultInput['results'][number];
+
+// "Save these parameters for next time". A test typed in when ordering (not from the clinic's list)
+// becomes a list entry — or joins the one with the same name — and the order is linked to it;
+// parameters typed into the table that the test does not have yet are added. Existing parameters
+// are never changed here. Returns the lines with their parameter ids filled in.
+const rememberTestParameters = async (tx: any, order: { lab_test_order_id: number; catalog_test_id: number | null; test_name: string; test_category: string | null }, lines: ResultLine[]) => {
+  let testId = order.catalog_test_id;
+  if (!testId) {
+    const existing = await tx.labTestCatalog.findFirst({ where: { test_name: { equals: order.test_name.trim(), mode: 'insensitive' } } });
+    testId = existing
+      ? existing.test_id
+      : (await tx.labTestCatalog.create({ data: { test_name: order.test_name.trim(), category: order.test_category || null } })).test_id;
+    await tx.labTestOrder.update({ where: { lab_test_order_id: order.lab_test_order_id }, data: { catalog_test_id: testId } });
+  }
+  const params = await tx.labTestParameter.findMany({ where: { test_id: testId } });
+  let nextOrder = params.reduce((max: number, p: any) => Math.max(max, p.display_order), 0);
+  const out: ResultLine[] = [];
+  for (const line of lines) {
+    if (line.parameter_id) {
+      out.push(line);
+      continue;
+    }
+    const name = line.parameter_name.trim();
+    const match = params.find((p: any) => p.parameter_name.trim().toLowerCase() === name.toLowerCase());
+    if (match) {
+      out.push({ ...line, parameter_id: match.parameter_id });
+      continue;
+    }
+    nextOrder += 1;
+    const created = await tx.labTestParameter.create({
+      data: { test_id: testId, parameter_name: name, unit: line.unit?.trim() || null, reference_range: line.reference_range?.trim() || null, display_order: nextOrder },
+    });
+    params.push(created);
+    out.push({ ...line, parameter_id: created.parameter_id });
+  }
+  return out;
+};
+
+const writeResults = async (tx: any, id: number, values: ResultLine[], actor: Actor) => {
+  await tx.labResult.deleteMany({ where: { lab_test_order_id: id } });
+  for (const r of values) {
+    await tx.labResult.create({
+      data: {
+        lab_test_order_id: id,
+        parameter_id: r.parameter_id,
+        parameter_name: r.parameter_name,
+        unit: r.unit,
+        reference_range: r.reference_range,
+        result_value: r.result_value.trim(),
+        result_flag: flagResult(r.result_value.trim(), r.reference_range),
+        entered_by: actor.user_id,
+      },
+    });
+  }
+};
+
+/**
+ * The front desk (or anyone who may see results) types in the values from the lab's report. The
+ * report counts as received; the order stays "Report Received" so it still reaches the doctor, who
+ * reviews it — with the values already filled in — and completes it.
+ */
+export const saveLabResults = async (id: number, input: CompleteResultInput, actor: Actor) => {
+  const order = await prisma.labTestOrder.findUnique({ where: { lab_test_order_id: id } });
+  if (!order) throw new NotFoundError('Lab test order not found');
+  if (order.status !== 'Pending' && order.status !== 'Report Received') {
+    throw new ValidationError(`Results can be entered only while the test is waiting for them (this one is ${order.status})`);
+  }
+  let values = input.results.filter((r) => r.result_value?.trim());
+  if (values.length === 0) throw new ValidationError('Enter at least one result value');
+
+  return prisma.$transaction(async (tx) => {
+    if (input.save_parameters) values = await rememberTestParameters(tx, order, values);
+    await writeResults(tx, id, values, actor);
+    return tx.labTestOrder.update({
+      where: { lab_test_order_id: id },
+      data: {
+        ...(order.status === 'Pending' ? { status: 'Report Received', report_received_at: new Date(), report_received_by: actor.user_id } : {}),
+        entered_by: actor.user_id,
+        entered_at: new Date(),
+      },
+      include: detailInclude,
+    });
+  });
+};
 
 // The doctor's single "enter values + review + finalize" action (FR-13-19) — replaces the old
 // two-step enterResult/review flow. Only reachable from Report Received, and only by a doctor
@@ -258,25 +347,12 @@ export const completeLabResult = async (id: number, input: CompleteResultInput, 
   if (order.status !== 'Report Received') {
     throw new ValidationError('Only an order whose report has been received can be completed');
   }
-  const values = input.results.filter((r) => r.result_value?.trim());
+  let values = input.results.filter((r) => r.result_value?.trim());
   if (values.length === 0) throw new ValidationError('At least one result value is required to complete this order');
 
   return prisma.$transaction(async (tx) => {
-    await tx.labResult.deleteMany({ where: { lab_test_order_id: id } });
-    for (const r of values) {
-      await tx.labResult.create({
-        data: {
-          lab_test_order_id: id,
-          parameter_id: r.parameter_id,
-          parameter_name: r.parameter_name,
-          unit: r.unit,
-          reference_range: r.reference_range,
-          result_value: r.result_value.trim(),
-          result_flag: flagResult(r.result_value.trim(), r.reference_range),
-          entered_by: actor.user_id,
-        },
-      });
-    }
+    if (input.save_parameters) values = await rememberTestParameters(tx, order, values);
+    await writeResults(tx, id, values, actor);
 
     return tx.labTestOrder.update({
       where: { lab_test_order_id: id },
@@ -301,25 +377,12 @@ export const updateCompletedResult = async (id: number, input: CompleteResultInp
   const order = await prisma.labTestOrder.findUnique({ where: { lab_test_order_id: id } });
   if (!order) throw new NotFoundError('Lab test order not found');
   if (order.status !== 'Completed') throw new ValidationError('Only a completed order can be amended');
-  const values = input.results.filter((r) => r.result_value?.trim());
+  let values = input.results.filter((r) => r.result_value?.trim());
   if (values.length === 0) throw new ValidationError('At least one result value is required');
 
   return prisma.$transaction(async (tx) => {
-    await tx.labResult.deleteMany({ where: { lab_test_order_id: id } });
-    for (const r of values) {
-      await tx.labResult.create({
-        data: {
-          lab_test_order_id: id,
-          parameter_id: r.parameter_id,
-          parameter_name: r.parameter_name,
-          unit: r.unit,
-          reference_range: r.reference_range,
-          result_value: r.result_value.trim(),
-          result_flag: flagResult(r.result_value.trim(), r.reference_range),
-          entered_by: actor.user_id,
-        },
-      });
-    }
+    if (input.save_parameters) values = await rememberTestParameters(tx, order, values);
+    await writeResults(tx, id, values, actor);
     return tx.labTestOrder.update({
       where: { lab_test_order_id: id },
       data: { review_notes: input.doctor_notes, interpretation: input.interpretation, entered_by: actor.user_id, entered_at: new Date() },

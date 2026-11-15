@@ -11,6 +11,7 @@ import '../dashboard/dashboard.css';
 import '../patients/patients.css';
 import '../pharmacy/pharmacy.css';
 import './labTestOrders.css';
+import { PatientLink } from '../../shared/patients/PatientPanel';
 
 const PER_PAGE_OPTIONS = [8, 20, 50, 100];
 
@@ -201,7 +202,7 @@ const LabTestOrders = () => {
                   <tr key={o.lab_test_order_id}>
                     <td>{o.request_number}</td>
                     <td>
-                      <div className="pat-name">{o.patient?.full_name}</div>
+                      <div className="pat-name"><PatientLink patientId={o.patient_id}>{o.patient?.full_name}</PatientLink></div>
                       <div className="pat-muted" style={{ fontSize: 11.5 }}>
                         {o.patient_id}
                       </div>

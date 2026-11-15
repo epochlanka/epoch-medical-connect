@@ -99,7 +99,7 @@ export const complete = async (req: Request, res: Response) => {
   try {
     const order = await service.completeLabResult(
       Number(req.params.labTestOrderId),
-      { results: req.body.results, doctor_notes: req.body.doctor_notes, interpretation: req.body.interpretation },
+      { results: req.body.results, doctor_notes: req.body.doctor_notes, interpretation: req.body.interpretation, save_parameters: req.body.save_parameters },
       actor(req)
     );
     res.status(200).json(order);
@@ -112,7 +112,7 @@ export const amendCompleted = async (req: Request, res: Response) => {
   try {
     const order = await service.updateCompletedResult(
       Number(req.params.labTestOrderId),
-      { results: req.body.results, doctor_notes: req.body.doctor_notes, interpretation: req.body.interpretation },
+      { results: req.body.results, doctor_notes: req.body.doctor_notes, interpretation: req.body.interpretation, save_parameters: req.body.save_parameters },
       actor(req)
     );
     res.status(200).json(order);
@@ -151,6 +151,15 @@ export const printResult = async (req: Request, res: Response) => {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="LabResult-${order.lab_test_order_id}.pdf"`);
     streamLabResultReportPdf(order, res);
+  } catch (error) {
+    handleError(req, res, error);
+  }
+};
+
+export const saveResults = async (req: Request, res: Response) => {
+  try {
+    const order = await service.saveLabResults(Number(req.params.labTestOrderId), { results: req.body.results, save_parameters: req.body.save_parameters }, actor(req));
+    res.status(200).json(order);
   } catch (error) {
     handleError(req, res, error);
   }

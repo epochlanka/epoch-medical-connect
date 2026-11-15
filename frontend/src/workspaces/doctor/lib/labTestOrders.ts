@@ -160,7 +160,14 @@ export interface CompleteLabResultInput {
   results: ResultParameterInput[];
   doctor_notes?: string;
   interpretation?: string;
+  /** Keep the parameters typed in for this test, so the next order of it comes with them. */
+  save_parameters?: boolean;
 }
+
+// Doctor, Admin or the front desk types in the values from the lab's report. The test stays
+// "Report Received" for the doctor to review and complete.
+export const saveLabResults = (id: number, input: Pick<CompleteLabResultInput, 'results' | 'save_parameters'>) =>
+  api.post<LabTestOrder>(`/lab-test-orders/${id}/results`, input);
 
 // Doctor/Admin only — the single "enter values + review + finalize" action.
 export const completeLabResult = (id: number, input: CompleteLabResultInput) => api.post<LabTestOrder>(`/lab-test-orders/${id}/complete`, input);

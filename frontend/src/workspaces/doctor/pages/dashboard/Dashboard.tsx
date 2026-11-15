@@ -15,6 +15,7 @@ import {
 import './dashboard.css';
 import './doctor-dashboard.css';
 import '../../styles/shared.css';
+import { PatientLink } from '../../../../shared/patients/PatientPanel';
 
 const formatTime = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 // "2 h 41 min" reads faster than "161 min" once waits pass an hour.
@@ -30,7 +31,7 @@ const PatientIdentity = ({ appointment }: { appointment: QueueAppointment }) => 
       <div className="rapid-avatar">{initials(name)}</div>
       <div className="rapid-patient-copy">
         <div className="rapid-patient-name">
-          {name}
+          <PatientLink patientId={appointment.patient_id}>{name}</PatientLink>
           {appointment.is_temporary && <span className="badge badge-amber">Temporary</span>}
         </div>
         <div className="rapid-patient-meta">

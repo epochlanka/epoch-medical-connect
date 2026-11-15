@@ -35,6 +35,7 @@ import '../patients/patients.css';
 import '../pharmacy/pharmacy.css';
 import '../appointments/appointments.css';
 import './invoices.css';
+import { PatientLink } from '../../shared/patients/PatientPanel';
 
 const PER_PAGE_OPTIONS = [8, 20, 50, 100];
 
@@ -368,7 +369,7 @@ const Invoices = () => {
                           <div className="pat-name-cell">
                             <div className="pat-avatar">{initials(inv.patient?.full_name ?? '?')}</div>
                             <div>
-                              <div className="pat-name">{inv.patient?.full_name}</div>
+                              <div className="pat-name"><PatientLink patientId={inv.patient?.patient_id}>{inv.patient?.full_name}</PatientLink></div>
                               <div className="pat-muted" style={{ fontSize: 11.5 }}>
                                 {inv.patient?.phone || ''}
                               </div>

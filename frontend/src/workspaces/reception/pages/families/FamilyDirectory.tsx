@@ -29,6 +29,7 @@ import { formatDate } from '../patients/patientUtils';
 import '../../styles/shared.css';
 import '../dashboard/dashboard.css';
 import './familyDirectory.css';
+import { PatientLink } from '../../../../shared/patients/PatientPanel';
 
 const PER_PAGE_OPTIONS = [10, 20, 50, 100];
 
@@ -283,7 +284,7 @@ const FamilyDirectory = () => {
                       </div>
                     </td>
                     <td className="pat-name">{f.family_name}</td>
-                    <td>{f.head_patient?.full_name || <span className="pat-muted">Not set</span>}</td>
+                    <td>{f.head_patient?.full_name ? <PatientLink patientId={f.head_patient.patient_id}>{f.head_patient.full_name}</PatientLink> : <span className="pat-muted">Not set</span>}</td>
                     <td>{f._count.patients}</td>
                     <td>{f.family_type || <span className="pat-muted">—</span>}</td>
                     <td>{f.contact_no || <span className="pat-muted">—</span>}</td>

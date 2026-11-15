@@ -30,6 +30,7 @@ import {
 } from '../../components/layout/Icons';
 import '../../styles/shared.css';
 import './checkIn.css';
+import { PatientLink } from '../../../../shared/patients/PatientPanel';
 
 /**
  * The front desk's home: find a patient and put them in the queue, or register a new one in a
@@ -717,7 +718,7 @@ const CheckIn = () => {
               <li key={e.appointmentId} className="chk-queue-row">
                 <span className="chk-token">{e.token}</span>
                 <span className="chk-queue-who">
-                  <strong>{e.patientName}</strong>
+                  <strong><PatientLink patientId={e.patientId}>{e.patientName}</PatientLink></strong>
                   <small>
                     Dr. {e.doctorName}
                     {e.status === 'Waiting' && e.waitTimeMinutes !== null && ` · ${e.waitTimeMinutes} min`}

@@ -5,8 +5,10 @@ import type { LabTestOrder } from '../../lib/labTestOrders';
 import { ClipboardIcon, CheckCircleIcon, ClockIcon, XCircleIcon, ChevronLeftIcon, ChevronRightIcon, RefreshIcon, PrintIcon } from '../../components/layout/Icons';
 import KpiCard from '../dashboard/KpiCard';
 import ReportReceivedModal from './ReportReceivedModal';
+import LabResultModal from '../../../doctor/pages/labTestOrders/LabResultModal';
 import '../../styles/shared.css';
 import '../dashboard/dashboard.css';
+import { PatientLink } from '../../../../shared/patients/PatientPanel';
 
 const PER_PAGE_OPTIONS = [8, 20, 50, 100];
 
@@ -24,6 +26,7 @@ const LabTestOrders = () => {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(8);
   const [receiveOrder, setReceiveOrder] = useState<LabTestOrder | null>(null);
+  const [resultOrderId, setResultOrderId] = useState<number | null>(null);
 
   const { data: result, loading, error, reload } = useApiData(
     () => listLabTestOrders({ status: status === 'all' ? undefined : status, page, limit }),
@@ -68,7 +71,7 @@ const LabTestOrders = () => {
       <div className="pat-header">
         <div>
           <h1>Lab test orders</h1>
-          <p>Tests the doctors have ordered. Mark a report as received once it arrives.</p>
+          <p>Tests the doctors have ordered. When a report comes back, press <strong>Enter results</strong> to type in its values; the doctor then reviews and completes it.</p>
         </div>
         <div className="pat-header-actions">
           <button className="pat-btn" onClick={refreshAll}>
@@ -191,7 +194,7 @@ const LabTestOrders = () => {
                   <tr key={o.lab_test_order_id}>
                     <td>{o.request_number}</td>
                     <td>
-                      <div className="pat-name">{o.patient?.full_name}</div>
+                      <div className="pat-name"><PatientLink patientId={o.patient_id}>{o.patient?.full_name}</PatientLink></div>
                       <div className="pat-muted" style={{ fontSize: 11.5 }}>
                         {o.patient_id}
                       </div>
@@ -205,13 +208,18 @@ const LabTestOrders = () => {
                       <span className={`badge ${STATUS_BADGE[o.status]}`}>{o.status}</span>
                     </td>
                     <td>
-                      <div style={{ display: 'flex', gap: 6 }}>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', minWidth: 200 }}>
                         <button className="pat-icon-btn" onClick={() => printLabTestOrder(o.lab_test_order_id)} aria-label="Print request">
                           <PrintIcon />
                         </button>
+                        {(o.status === 'Pending' || o.status === 'Report Received') && (
+                          <button className="pat-btn primary" style={{ fontSize: 12, padding: '4px 8px' }} onClick={() => setResultOrderId(o.lab_test_order_id)}>
+                            <ClipboardIcon /> Enter results
+                          </button>
+                        )}
                         {o.status === 'Pending' && (
-                          <button className="pat-btn" style={{ fontSize: 11, padding: '4px 8px' }} onClick={() => setReceiveOrder(o)}>
-                            Report Received
+                          <button className="pat-btn" style={{ fontSize: 12, padding: '4px 8px' }} onClick={() => setReceiveOrder(o)} title="Mark the report as back and attach the scanned report">
+                            Attach report
                           </button>
                         )}
                       </div>
@@ -267,6 +275,17 @@ const LabTestOrders = () => {
         )}
       </div>
 
+      {resultOrderId && (
+        <LabResultModal
+          mode="entry"
+          orderId={resultOrderId}
+          onClose={() => setResultOrderId(null)}
+          onSaved={() => {
+            setResultOrderId(null);
+            refreshAll();
+          }}
+        />
+      )}
       {receiveOrder && (
         <ReportReceivedModal
           order={receiveOrder}
