@@ -41,12 +41,18 @@ SQL
 echo "Fetching $image from the local image store ..."
 docker pull "$image"
 
-mkdir -p data/backups
-dump="data/backups/before-update-$version-$stamp.dump"
+# data/backups belongs to the containers' user on some installs; keep the update's own copies beside
+# it in the home folder then, rather than failing before the update starts.
+backups=data/backups
+if ! { mkdir -p "$backups" 2>/dev/null && [ -w "$backups" ]; }; then
+  backups="$HOME/epoch-update-backups"
+  mkdir -p "$backups" && chmod 700 "$backups"
+fi
+dump="$backups/before-update-$version-$stamp.dump"
 echo "Backing up the database to $dump ..."
 docker exec "$db" sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$dump"
 chmod 600 "$dump"
-counts > "data/backups/counts-before-$version.txt"
+counts > "$backups/counts-before-$version.txt"
 
 # Keep the running version for rollback.
 docker tag epoch-medical:clinic "epoch-medical:before-$version"
@@ -61,15 +67,15 @@ fi
 
 SKIP_IMAGE_LOAD=1 ./start-clinic.sh
 
-counts > "data/backups/counts-after-$version.txt"
-if diff "data/backups/counts-before-$version.txt" "data/backups/counts-after-$version.txt" >/dev/null; then
+counts > "$backups/counts-after-$version.txt"
+if diff "$backups/counts-before-$version.txt" "$backups/counts-after-$version.txt" >/dev/null; then
   echo ""
   echo "Records unchanged by the update:"
-  sed 's/^/  /' "data/backups/counts-after-$version.txt"
+  sed 's/^/  /' "$backups/counts-after-$version.txt"
 else
   echo "" >&2
   echo "WARNING: record counts or checksums differ after the update:" >&2
-  diff "data/backups/counts-before-$version.txt" "data/backups/counts-after-$version.txt" >&2 || true
+  diff "$backups/counts-before-$version.txt" "$backups/counts-after-$version.txt" >&2 || true
   echo "The pre-update backup is $dump." >&2
   exit 2
 fi
