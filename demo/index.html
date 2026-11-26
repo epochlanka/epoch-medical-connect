@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>E-POCH Medical System — Clinic management for doctors, reception and pharmacy</title>
+  <meta name="description" content="E-POCH connects reception, the doctor and the pharmacy in one system: one visit, one record, one prescription, one bill.">
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="#top">
+      <img src="assets/logo.svg" alt="" width="36" height="36">
+      <span><b>E-POCH</b><small>Medical System</small></span>
+    </a>
+    <nav class="nav-links" id="navLinks">
+      <a href="#workflow">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#setup">Setup</a>
+      <a href="#contact">Contact</a>
+      <a class="btn btn-primary btn-sm" href="app.html">Try the live demo</a>
+    </nav>
+    <button class="nav-toggle" id="navToggle" aria-label="Open menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <p class="eyebrow">Clinic management for Sri Lankan practices</p>
+        <h1>One visit. One record.<br><span class="grad">Zero paperwork chaos.</span></h1>
+        <p class="lead">
+          E-POCH connects your front desk, the doctor's room and the dispensary.
+          A patient is registered once. The doctor's notes and prescription reach the
+          pharmacy straight away, and the bill builds itself.
+        </p>
+        <div class="hero-cta">
+          <a class="btn btn-primary btn-lg" href="app.html">Open the live demo &rarr;</a>
+          <a class="btn btn-ghost btn-lg" href="#workflow">See how it works</a>
+        </div>
+        <p class="hero-note">The demo runs in your browser with made-up patients. Nothing you type leaves your computer.</p>
+      </div>
+
+      <div class="hero-visual" aria-hidden="true">
+        <div class="mock">
+          <div class="mock-bar"><i></i><i></i><i></i><span>Doctor · Today</span></div>
+          <div class="mock-body">
+            <div class="mock-live">
+              <small><b class="dot"></b> Consultation in progress</small>
+              <div class="mock-live-row">
+                <strong class="tok">T-003</strong>
+                <span class="av">NP</span>
+                <div><b>Nimali Perera</b><em>PT-0002 · 41 Y · Female</em></div>
+              </div>
+            </div>
+            <div class="mock-stats">
+              <div><b>4</b><span>Waiting</span></div>
+              <div><b>12</b><span>Completed</span></div>
+              <div><b>2</b><span>Lab results</span></div>
+            </div>
+            <div class="mock-rx">
+              <div class="mock-rx-h">Prescription</div>
+              <div class="mock-rx-row"><span>Paracetamol 500 mg</span><em>TDS · 3 days</em></div>
+              <div class="mock-rx-row"><span>Cetirizine 10 mg</span><em>Nocte · 5 days</em></div>
+              <div class="mock-rx-row warn"><span>&#9888; Amoxicillin — allergy</span><em>blocked</em></div>
+            </div>
+          </div>
+        </div>
+        <div class="float f1"><b>&#10003;</b> Sent to pharmacy</div>
+        <div class="float f2"><b>Rs 2,450</b> invoice ready</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Trust strip -->
+  <section class="strip">
+    <div class="wrap strip-grid">
+      <div><b>4</b><span>workspaces in one app</span></div>
+      <div><b>0</b><span>internet needed in the clinic</span></div>
+      <div><b>FEFO</b><span>earliest-expiry stock first</span></div>
+      <div><b>Audit</b><span>trail on every record</span></div>
+    </div>
+  </section>
+
+  <!-- Workflow -->
+  <section class="section" id="workflow">
+    <div class="wrap">
+      <p class="eyebrow center">How a visit flows</p>
+      <h2 class="center">From the front door to the medicine counter</h2>
+      <p class="sub center">Every step is linked to the same visit, so nothing is copied by hand and nothing goes missing.</p>
+
+      <ol class="flow">
+        <li class="flow-step c-reception">
+          <span class="flow-num">1</span>
+          <h3>Reception</h3>
+          <p>Find or register the patient by name, phone or NIC. Add them to today's queue and print a token.</p>
+        </li>
+        <li class="flow-step c-doctor">
+          <span class="flow-num">2</span>
+          <h3>Doctor</h3>
+          <p>Call the next patient. Record vitals, findings and diagnosis. Allergies are shown before you prescribe.</p>
+        </li>
+        <li class="flow-step c-pharmacy">
+          <span class="flow-num">3</span>
+          <h3>Pharmacy</h3>
+          <p>The prescription appears on the dispensary screen. The batch expiring first is picked automatically.</p>
+        </li>
+        <li class="flow-step c-billing">
+          <span class="flow-num">4</span>
+          <h3>Billing</h3>
+          <p>Consultation fee and dispensed medicines are on one invoice. Take cash, card or a split payment.</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="section alt" id="features">
+    <div class="wrap">
+      <p class="eyebrow center">Built for each person in the clinic</p>
+      <h2 class="center">Everyone gets the screen they need</h2>
+      <p class="sub center">Staff sign in once. The workspace follows their role, and front-desk staff can switch between reception and pharmacy without signing out.</p>
+
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-tab="reception" role="tab">Reception</button>
+        <button class="tab" data-tab="doctor" role="tab">Doctor</button>
+        <button class="tab" data-tab="pharmacy" role="tab">Pharmacy</button>
+        <button class="tab" data-tab="admin" role="tab">Administration</button>
+      </div>
+
+      <div class="panel active" data-panel="reception">
+        <div class="feature-grid">
+          <div class="feature"><span class="ic">&#128269;</span><h4>Fast patient search</h4><p>Name, patient number, phone or NIC from one box. Duplicate warnings when registering.</p></div>
+          <div class="feature"><span class="ic">&#128106;</span><h4>Families</h4><p>Link family members to one household so returning families are found in seconds.</p></div>
+          <div class="feature"><span class="ic">&#127915;</span><h4>Live queue</h4><p>Tokens, waiting times and status from arrival to completion, shared with the doctor's screen.</p></div>
+          <div class="feature"><span class="ic">&#128197;</span><h4>Appointments</h4><p>Book ahead or add walk-ins. Follow-ups the doctor asked for show up when they are due.</p></div>
+          <div class="feature"><span class="ic">&#128179;</span><h4>Payments</h4><p>Cash, card and split payments. End-of-day close shows what the drawer should hold.</p></div>
+          <div class="feature"><span class="ic">&#129514;</span><h4>Lab results</h4><p>Front desk can enter results from outside labs so the doctor sees them at the next visit.</p></div>
+        </div>
+      </div>
+
+      <div class="panel" data-panel="doctor">
+        <div class="feature-grid">
+          <div class="feature"><span class="ic">&#129658;</span><h4>Consultation workspace</h4><p>Vitals, complaint, findings and diagnosis on one page, saved as a draft while you work.</p></div>
+          <div class="feature"><span class="ic">&#9888;&#65039;</span><h4>Allergy checks</h4><p>Known allergies are shown at the top, and a medicine that conflicts is flagged before it is prescribed.</p></div>
+          <div class="feature"><span class="ic">&#128138;</span><h4>Prescription builder</h4><p>Search the clinic's own stock. OD, BD, TDS, Nocte, SOS or custom timings, with start dates.</p></div>
+          <div class="feature"><span class="ic">&#128220;</span><h4>Full patient history</h4><p>Every past visit, prescription and lab result in a side panel without leaving the consultation.</p></div>
+          <div class="feature"><span class="ic">&#129514;</span><h4>Lab requests</h4><p>One printable lab request per visit, and a lab results inbox for review.</p></div>
+          <div class="feature"><span class="ic">&#128200;</span><h4>Clinical statistics</h4><p>Consultations, common diagnoses and follow-ups due at a glance.</p></div>
+        </div>
+      </div>
+
+      <div class="panel" data-panel="pharmacy">
+        <div class="feature-grid">
+          <div class="feature"><span class="ic">&#128203;</span><h4>Dispensing queue</h4><p>New prescriptions arrive automatically with a sound alert. Prepare, then hand over.</p></div>
+          <div class="feature"><span class="ic">&#128230;</span><h4>Batch &amp; expiry tracking</h4><p>Every batch has its own expiry. The earliest-expiring stock is always suggested first.</p></div>
+          <div class="feature"><span class="ic">&#128680;</span><h4>Low-stock &amp; expiry alerts</h4><p>Know what to reorder and what to use up before it expires.</p></div>
+          <div class="feature"><span class="ic">&#128666;</span><h4>Suppliers &amp; purchase orders</h4><p>Raise orders, receive goods and add new batches in one step.</p></div>
+          <div class="feature"><span class="ic">&#127991;&#65039;</span><h4>Labels</h4><p>Print dispensing labels with the dose and timing in plain words.</p></div>
+          <div class="feature"><span class="ic">&#128209;</span><h4>Stock ledger</h4><p>Every movement — received, dispensed, adjusted — with who did it and why.</p></div>
+        </div>
+      </div>
+
+      <div class="panel" data-panel="admin">
+        <div class="feature-grid">
+          <div class="feature"><span class="ic">&#128202;</span><h4>Dashboard</h4><p>Patients today, revenue, low stock and expiring batches on one screen.</p></div>
+          <div class="feature"><span class="ic">&#128200;</span><h4>Reports</h4><p>Revenue by day, top medicines and visit volume. Export when you need it.</p></div>
+          <div class="feature"><span class="ic">&#128101;</span><h4>Users &amp; roles</h4><p>Admin, Doctor, Reception, Pharmacy and Front Desk roles with clear permissions.</p></div>
+          <div class="feature"><span class="ic">&#128737;&#65039;</span><h4>Audit trail</h4><p>Every change to a clinical or financial record is logged with user and time.</p></div>
+          <div class="feature"><span class="ic">&#128190;</span><h4>Backups</h4><p>Automatic database backups and a documented restore procedure.</p></div>
+          <div class="feature"><span class="ic">&#9881;&#65039;</span><h4>Clinic settings</h4><p>Clinic name, fees, payment methods and alert thresholds.</p></div>
+        </div>
+      </div>
+
+      <div class="center mt">
+        <a class="btn btn-primary btn-lg" href="app.html">Try every workspace in the demo &rarr;</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Setup -->
+  <section class="section" id="setup">
+    <div class="wrap setup-grid">
+      <div>
+        <p class="eyebrow">Runs inside your clinic</p>
+        <h2>Your data stays on your premises</h2>
+        <p class="sub">E-POCH runs on a computer at the front desk. The doctor's computer only needs a web browser on the same network. The clinic keeps working when the internet is down.</p>
+        <ul class="checks">
+          <li>Works on the computers you already have</li>
+          <li>No monthly cloud storage of patient records</li>
+          <li>Automatic daily backups</li>
+          <li>Updates installed remotely, with rollback if needed</li>
+          <li>Staff training at your clinic</li>
+        </ul>
+      </div>
+      <div class="network" aria-hidden="true">
+        <div class="node n-front"><span>&#128421;&#65039;</span><b>Front desk PC</b><em>Reception &middot; Pharmacy &middot; Server</em></div>
+        <div class="wire"><i></i></div>
+        <div class="node n-doc"><span>&#128187;</span><b>Doctor's PC</b><em>Browser only</em></div>
+        <div class="lan">Clinic network (LAN)</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta-band">
+    <div class="wrap cta-inner">
+      <div>
+        <h2>See it with your own clinic's day in mind</h2>
+        <p>Register a patient, consult, prescribe, dispense and bill. The full visit takes about three minutes in the demo.</p>
+      </div>
+      <a class="btn btn-white btn-lg" href="app.html">Start the demo &rarr;</a>
+    </div>
+  </section>
+
+  <!-- Contact -->
+  <section class="section" id="contact">
+    <div class="wrap contact">
+      <p class="eyebrow center">Get in touch</p>
+      <h2 class="center">Bring E-POCH to your clinic</h2>
+      <p class="sub center">We will visit, install it on your computers and train your staff.</p>
+      <div class="contact-cards" id="contactCards"></div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <span>&copy; <span id="year"></span> E-POCH Medical System</span>
+    <span>This demo uses fictional patients and data.</span>
+  </div>
+</footer>
+
+<script src="js/config.js"></script>
+<script src="js/site.js"></script>
+</body>
+</html>
