@@ -4,7 +4,7 @@
  */
 window.EPOCH_DEMO = {
   contact: {
-    phone: "",      // e.g. "+94 77 123 4567"
+    phone: "+94 76 843 7970",
     whatsapp: "",   // digits only with country code, e.g. "94771234567"
     email: "epochadminlk@gmail.com",
   },
