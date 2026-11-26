@@ -26,7 +26,7 @@
   var cards = [];
   function esc(s) { return String(s).replace(/[&<>"']/g, function (ch) { return "&#" + ch.charCodeAt(0) + ";"; }); }
   if (c.phone) cards.push({ ic: "📞", label: "Call us", value: c.phone, href: "tel:" + c.phone.replace(/\s/g, "") });
-  if (c.whatsapp) cards.push({ ic: "💬", label: "WhatsApp", value: "Message us", href: "https://wa.me/" + c.whatsapp.replace(/\D/g, "") });
+  if (c.whatsapp) cards.push({ ic: "💬", label: "WhatsApp", value: "Message us", href: /^https:\/\//.test(c.whatsapp) ? c.whatsapp : "https://wa.me/" + c.whatsapp.replace(/\D/g, "") });
   if (c.email) cards.push({ ic: "✉️", label: "Email", value: c.email, href: "mailto:" + c.email });
   var box = document.getElementById("contactCards");
   if (cards.length) {
